@@ -10,6 +10,7 @@
 import Metal
 import MetalKit
 import simd
+import Cocoa
 
 // The 256 byte aligned size of our uniform structure
 let alignedUniformsSize = (MemoryLayout<Uniforms>.size + 0xFF) & -0x100
@@ -20,6 +21,11 @@ enum RendererError: Error {
     case badVertexDescriptor
 }
 
+public enum ScalarSize {
+    case BITS_8
+    case BITS_16
+}
+
 class Renderer: NSObject, MTKViewDelegate {
 
     public let device: MTLDevice
@@ -28,6 +34,11 @@ class Renderer: NSObject, MTKViewDelegate {
     var pipelineState: MTLRenderPipelineState
     var depthState: MTLDepthStencilState
     var colorMap: MTLTexture
+    var octreeUInt8: Octree<Brick<UInt8>, UInt8>?
+    var octreeUInt16: Octree<Brick<UInt16>, UInt16>?
+    var scalarSize: ScalarSize = .BITS_8
+    let fps: FPS = FPS(interval: 0.3)
+    var fpsLabel: NSTextField?
 
     let inFlightSemaphore = DispatchSemaphore(value: maxBuffersInFlight)
 
@@ -42,6 +53,24 @@ class Renderer: NSObject, MTKViewDelegate {
     var rotation: Float = 0
 
     var mesh: MTKMesh
+    
+    public func SetScalarSize(size: ScalarSize) {
+        self.scalarSize = size
+    }
+    
+    public func setOctreeUInt8(ocTree: Octree<Brick<UInt8>, UInt8>) {
+        self.octreeUInt8 = ocTree
+        self.scalarSize = .BITS_8
+    }
+    
+    public func setOctreeUInt16(ocTree: Octree<Brick<UInt16>, UInt16>) {
+        self.octreeUInt16 = ocTree
+        self.scalarSize = .BITS_16
+    }
+    
+    public func setFPSlabel(label: NSTextField) {
+        self.fpsLabel = label
+    }
 
     init?(metalKitView: MTKView) {
         self.device = metalKitView.device!
@@ -205,7 +234,27 @@ class Renderer: NSObject, MTKViewDelegate {
         let modelMatrix = matrix4x4_rotation(radians: rotation, axis: rotationAxis)
         let viewMatrix = matrix4x4_translation(0.0, 0.0, -8.0)
         uniforms[0].modelViewMatrix = simd_mul(viewMatrix, modelMatrix)
-        rotation += 0.01
+        //rotation += 0.01
+    }
+    
+    private func generateWorkingSet() {
+        let c: Double = 1
+        switch scalarSize {
+        case .BITS_8:
+            if self.octreeUInt8 != nil {
+                let bricks: [Brick<UInt8>]? = (self.octreeUInt8?.findNodeCut(cameraPos: vector_double3(0, 0, -8), c: c))
+                for brick in bricks! {
+                    print("\(brick)")
+                }
+            }
+        case .BITS_16:
+            if self.octreeUInt16 != nil {
+                let bricks: [Brick<UInt16>] = (self.octreeUInt16?.findNodeCut(cameraPos: vector_double3(0, 0, -8), c: c))!
+                for brick in bricks {
+                    print("\(brick)")
+                }
+            }
+        }
     }
 
     func draw(in view: MTKView) {
@@ -217,11 +266,19 @@ class Renderer: NSObject, MTKViewDelegate {
             let semaphore = inFlightSemaphore
             commandBuffer.addCompletedHandler { (_ commandBuffer)-> Swift.Void in
                 semaphore.signal()
+                let fpsa: Float = self.fps.getFPS(time: commandBuffer.gpuEndTime)
+                if fpsa != 0 {
+                    DispatchQueue.main.async {
+                        self.fpsLabel!.stringValue = String.init(format: "%0.1f FPS", fpsa)
+                    }
+                }
             }
             
             self.updateDynamicBufferState()
             
             self.updateGameState()
+            
+            self.generateWorkingSet()
             
             /// Delay getting the currentRenderPassDescriptor until we absolutely need it to avoid
             ///   holding onto the drawable and blocking the display pipeline any longer than necessary
