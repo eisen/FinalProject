@@ -36,12 +36,23 @@ typedef NS_ENUM(NSInteger, VertexAttribute)
 typedef NS_ENUM(NSInteger, TextureIndex)
 {
     TextureIndexColor    = 0,
+    BrickPoolIndex       = 1
 };
+
+typedef struct {
+    vector_float3 position;
+    vector_float3 right;
+    vector_float3 up;
+    vector_float3 forward;
+} Camera;
 
 typedef struct
 {
     matrix_float4x4 projectionMatrix;
     matrix_float4x4 modelViewMatrix;
+    unsigned int width;
+    unsigned int height;
+    Camera camera;
 } Uniforms;
 
 #endif /* ShaderTypes_h */

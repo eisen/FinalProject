@@ -54,9 +54,10 @@ class GameViewController: NSViewController, NSOpenSavePanelDelegate {
     
     @IBAction
     func selectFile(_ sender: NSObject) {
+
         let myFileDialog = NSOpenPanel()
         
-        myFileDialog.accessoryView = rawView
+        myFileDialog.accessoryView = self.rawView
         myFileDialog.delegate = self
         myFileDialog.isAccessoryViewDisclosed = true
         myFileDialog.allowsMultipleSelection = false
@@ -65,13 +66,13 @@ class GameViewController: NSViewController, NSOpenSavePanelDelegate {
         
         if myFileDialog.runModal() == .OK {
             let url = myFileDialog.url!
-            let width = rawView.GetWidth()
-            let height = rawView.GetHeight()
-            let depth = rawView.GetDepth()
+            let width = self.rawView.GetWidth()
+            let height = self.rawView.GetHeight()
+            let depth = self.rawView.GetDepth()
             
-            ShowProgress()
+            self.ShowProgress()
             
-            switch rawView.GetScalarSize() {
+            switch self.rawView.GetScalarSize() {
             case .BITS_16:
                 self.renderer.SetScalarSize(size: .BITS_16)
                 self.loadVolumeSet16(datFile: url, width: width, height: height, depth: depth)
@@ -80,7 +81,7 @@ class GameViewController: NSViewController, NSOpenSavePanelDelegate {
                 self.loadVolumeSet8(datFile: url, width: width, height: height, depth: depth)
             }
         } else {
-            HideProgress()
+            self.HideProgress()
         }
     }
     

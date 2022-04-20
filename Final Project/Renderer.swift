@@ -9,6 +9,7 @@
 
 import Metal
 import MetalKit
+import MetalPerformanceShaders
 import simd
 import Cocoa
 
@@ -32,10 +33,19 @@ class Renderer: NSObject, MTKViewDelegate {
     let commandQueue: MTLCommandQueue
     var dynamicUniformBuffer: MTLBuffer
     var pipelineState: MTLRenderPipelineState
+    var rtPipelineState: MTLComputePipelineState?
     var depthState: MTLDepthStencilState
     var colorMap: MTLTexture
     var octreeUInt8: Octree<Brick<UInt8>, UInt8>?
+    var bricks8Cut: [Brick<UInt8>] = []
     var octreeUInt16: Octree<Brick<UInt16>, UInt16>?
+    var bricks16Cut: [Brick<UInt16>] = []
+    
+    var accumulationTargets: [MTLTexture] = []
+    var accumulationTargetIdx = 1
+    
+    var intersectionFunctionTable: MTLIntersectionFunctionTable?
+    
     var scalarSize: ScalarSize = .BITS_8
     let fps: FPS = FPS(interval: 0.3)
     var fpsLabel: NSTextField?
@@ -54,6 +64,21 @@ class Renderer: NSObject, MTKViewDelegate {
 
     var mesh: MTKMesh
     
+    var intersector: MPSRayIntersector?
+    
+    var brickPool: MTLTexture?
+    
+    var accStructDesc: MTLPrimitiveAccelerationStructureDescriptor?
+    
+    var accStruct: MTLAccelerationStructure?
+    
+    var scratchBuffer: MTLBuffer?
+    var bboxBuffer: MTLBuffer?
+    
+    var size: CGSize?
+    
+    //var macroCellPool: MTLTexture?
+    
     public func SetScalarSize(size: ScalarSize) {
         self.scalarSize = size
     }
@@ -61,15 +86,96 @@ class Renderer: NSObject, MTKViewDelegate {
     public func setOctreeUInt8(ocTree: Octree<Brick<UInt8>, UInt8>) {
         self.octreeUInt8 = ocTree
         self.scalarSize = .BITS_8
+        
+        let brickPoolDesc = MTLTextureDescriptor.init()
+        
+        brickPoolDesc.textureType = .type3D
+        brickPoolDesc.height = 128 * 8
+        brickPoolDesc.width = 128 * 8
+        brickPoolDesc.depth = 128 * 9
+        brickPoolDesc.pixelFormat = .r8Uint
+        
+        self.brickPool = self.device.makeTexture(descriptor: brickPoolDesc)!
+        self.brickPool?.label = "Brick Pool UInt8"
+        
+        //        let macroCellPoolDesc = MTLTextureDescriptor.init()
+        //
+        //        macroCellPoolDesc.textureType = .type3D
+        //        macroCellPoolDesc.height = 128 * 8
+        //        macroCellPoolDesc.width = 128 * 8
+        //        macroCellPoolDesc.depth = 128 * 9
+        //        brickPoolDesc.pixelFormat = .r32Uint
+        //
+        //        self.macroCellPool = self.device.makeTexture(descriptor: macroCellPoolDesc)!
     }
     
     public func setOctreeUInt16(ocTree: Octree<Brick<UInt16>, UInt16>) {
         self.octreeUInt16 = ocTree
         self.scalarSize = .BITS_16
+        
+        let brickPoolDesc = MTLTextureDescriptor.init()
+        
+        brickPoolDesc.textureType = .type3D
+        brickPoolDesc.height = 128 * 8
+        brickPoolDesc.width = 128 * 8
+        brickPoolDesc.depth = 128 * 9
+        brickPoolDesc.pixelFormat = .r16Uint
+        
+        self.brickPool = self.device.makeTexture(descriptor: brickPoolDesc)!
+        self.brickPool?.label = "Brick Pool UInt16"
     }
     
     public func setFPSlabel(label: NSTextField) {
         self.fpsLabel = label
+    }
+    
+    public func createAccelerationDesc() {
+        var accStructs: [MTLAccelerationStructure] = []
+        self.accStructDesc = MTLPrimitiveAccelerationStructureDescriptor()
+        let geomDesc = MTLAccelerationStructureBoundingBoxGeometryDescriptor()
+        
+        var bbox = MTLAxisAlignedBoundingBox()
+        
+        bbox.min = MTLPackedFloat3Make(0, 0, 0)
+        bbox.max = MTLPackedFloat3Make(2.55, 2.55, 2.55)
+        
+        self.bboxBuffer = self.device.makeBuffer(length: MemoryLayout<MTLAxisAlignedBoundingBox>.size, options: .storageModeShared)
+        memcpy(self.bboxBuffer?.contents(), &bbox, 1);
+        
+        geomDesc.boundingBoxBuffer = bboxBuffer
+        geomDesc.boundingBoxCount = 1
+        
+        self.accStructDesc?.geometryDescriptors = [ geomDesc ]
+        
+        let sizes = self.device.accelerationStructureSizes(descriptor: accStructDesc!)
+        self.accStruct = self.device.makeAccelerationStructure(size: sizes.accelerationStructureSize)
+        self.accStruct?.label = "Acceleration Structure"
+        self.scratchBuffer = self.device.makeBuffer(length: sizes.buildScratchBufferSize, options: .storageModePrivate)
+        self.scratchBuffer?.label = "Scratch Buffer"
+        
+        accStructs.append(self.accStruct!)
+        
+        let instanceBuffer = device.makeBuffer(length: MemoryLayout<MTLAccelerationStructureInstanceDescriptor>.size, options: .storageModeManaged)
+        let instanceDesc: UnsafeMutablePointer<MTLAccelerationStructureInstanceDescriptor> = (instanceBuffer?.contents().assumingMemoryBound(to: MTLAccelerationStructureInstanceDescriptor.self))!
+        
+        instanceDesc[0].accelerationStructureIndex = 0
+        instanceDesc[0].options = .nonOpaque
+        instanceDesc[0].intersectionFunctionTableOffset = 0
+        
+        var destCols = instanceDesc[0].transformationMatrix.columns
+        let srcCols = self.uniforms[0].modelViewMatrix.columns
+        
+        destCols.0 = MTLPackedFloat3Make(srcCols.0.x, srcCols.0.y, srcCols.0.z)
+        destCols.1 = MTLPackedFloat3Make(srcCols.1.x, srcCols.1.y, srcCols.1.z)
+        destCols.2 = MTLPackedFloat3Make(srcCols.2.x, srcCols.2.y, srcCols.2.z)
+        destCols.3 = MTLPackedFloat3Make(srcCols.3.x, srcCols.3.y, srcCols.3.z)
+        instanceDesc[0].transformationMatrix.columns = destCols
+
+        let accelDescriptor = MTLInstanceAccelerationStructureDescriptor()
+        
+        accelDescriptor.instancedAccelerationStructures = accStructs
+        accelDescriptor.instanceCount = 1
+        accelDescriptor.instanceDescriptorBuffer = instanceBuffer
     }
 
     init?(metalKitView: MTKView) {
@@ -81,7 +187,7 @@ class Renderer: NSObject, MTKViewDelegate {
         self.dynamicUniformBuffer = self.device.makeBuffer(length:uniformBufferSize,
                                                            options:[MTLResourceOptions.storageModeShared])!
 
-        self.dynamicUniformBuffer.label = "UniformBuffer"
+        self.dynamicUniformBuffer.label = "Uniforms Buffer"
 
         uniforms = UnsafeMutableRawPointer(dynamicUniformBuffer.contents()).bindMemory(to:Uniforms.self, capacity:1)
 
@@ -120,6 +226,17 @@ class Renderer: NSObject, MTKViewDelegate {
         }
 
         super.init()
+        
+        self.createAccelerationDesc()
+        
+        do {
+            rtPipelineState = try self.buildComputePipelineWithDevice(device: device,
+                                                                       metalKitView: metalKitView,
+                                                                       mtlVertexDescriptor: mtlVertexDescriptor)
+        } catch {
+            print("Unable to compile render pipeline state.  Error info: \(error)")
+            return nil
+        }
 
     }
 
@@ -155,21 +272,62 @@ class Renderer: NSObject, MTKViewDelegate {
 
         let library = device.makeDefaultLibrary()
 
-        let vertexFunction = library?.makeFunction(name: "vertexShader")
-        let fragmentFunction = library?.makeFunction(name: "fragmentShader")
+//        let vertexFunction = library?.makeFunction(name: "vertexShader")
+//        let fragmentFunction = library?.makeFunction(name: "fragmentShader")
+        
+        let vertexFunction = library?.makeFunction(name: "copyVertex")
+        let fragmentFunction = library?.makeFunction(name: "copyFragment")
 
         let pipelineDescriptor = MTLRenderPipelineDescriptor()
         pipelineDescriptor.label = "RenderPipeline"
-        pipelineDescriptor.sampleCount = metalKitView.sampleCount
+        //pipelineDescriptor.sampleCount = metalKitView.sampleCount
         pipelineDescriptor.vertexFunction = vertexFunction
         pipelineDescriptor.fragmentFunction = fragmentFunction
-        pipelineDescriptor.vertexDescriptor = mtlVertexDescriptor
+        //pipelineDescriptor.vertexDescriptor = mtlVertexDescriptor
 
         pipelineDescriptor.colorAttachments[0].pixelFormat = metalKitView.colorPixelFormat
         pipelineDescriptor.depthAttachmentPixelFormat = metalKitView.depthStencilPixelFormat
         pipelineDescriptor.stencilAttachmentPixelFormat = metalKitView.depthStencilPixelFormat
 
         return try device.makeRenderPipelineState(descriptor: pipelineDescriptor)
+    }
+    
+    func buildComputePipelineWithDevice(device: MTLDevice,
+                                             metalKitView: MTKView,
+                                             mtlVertexDescriptor: MTLVertexDescriptor) throws -> MTLComputePipelineState {
+        let library = device.makeDefaultLibrary()!
+        
+        let constants = MTLFunctionConstantValues()
+        var resourceStride = MemoryLayout<MTLAxisAlignedBoundingBox>.size
+        var useIntersectionFunctions = true
+        
+        constants.setConstantValue(&resourceStride, type: .uint, index: 0)
+        constants.setConstantValue(&useIntersectionFunctions, type: .bool, index: 1)
+        
+        let intersectionFunctionDesc = MTLIntersectionFunctionDescriptor()
+        intersectionFunctionDesc.name = "brickIntersectionFunc"
+        intersectionFunctionDesc.constantValues = constants
+        let function = try library.makeIntersectionFunction(descriptor: intersectionFunctionDesc)
+        
+        let intersectionFunctionTableDesc = MTLIntersectionFunctionTableDescriptor()
+        intersectionFunctionTableDesc.functionCount = 1
+
+        let computePipelineDesc = MTLComputePipelineDescriptor()
+        computePipelineDesc.computeFunction = library.makeFunction(name: "interceptBricks")!
+        
+        let linkedFunctions = MTLLinkedFunctions()
+        linkedFunctions.functions = [function]
+        computePipelineDesc.linkedFunctions = linkedFunctions
+        
+        let computePipelineState = try device.makeComputePipelineState(descriptor: computePipelineDesc, options: .bufferTypeInfo, reflection: nil)
+        
+        self.intersectionFunctionTable = computePipelineState.makeIntersectionFunctionTable(descriptor: intersectionFunctionTableDesc)
+        self.intersectionFunctionTable?.setBuffer(self.bboxBuffer, offset: 0, index: 0)
+        
+        let functionHandle = computePipelineState.functionHandle(function: function)
+        self.intersectionFunctionTable?.setFunction(functionHandle, index: 0)
+        
+        return computePipelineState
     }
 
     class func buildMesh(device: MTLDevice,
@@ -178,9 +336,9 @@ class Renderer: NSObject, MTKViewDelegate {
 
         let metalAllocator = MTKMeshBufferAllocator(device: device)
 
-        let mdlMesh = MDLMesh.newBox(withDimensions: SIMD3<Float>(4, 4, 4),
-                                     segments: SIMD3<UInt32>(2, 2, 2),
-                                     geometryType: MDLGeometryType.triangles,
+        let mdlMesh = MDLMesh.newBox(withDimensions: SIMD3<Float>(1.28, 1.28, 1.28),
+                                     segments: SIMD3<UInt32>(1, 1, 1),
+                                     geometryType: MDLGeometryType.quads,
                                      inwardNormals:false,
                                      allocator: metalAllocator)
 
@@ -232,8 +390,15 @@ class Renderer: NSObject, MTKViewDelegate {
 
         let rotationAxis = SIMD3<Float>(1, 1, 0)
         let modelMatrix = matrix4x4_rotation(radians: rotation, axis: rotationAxis)
-        let viewMatrix = matrix4x4_translation(0.0, 0.0, -8.0)
+        let viewMatrix = matrix4x4_translation(0.0, 0.0, -2.0)
         uniforms[0].modelViewMatrix = simd_mul(viewMatrix, modelMatrix)
+        
+        uniforms[0].width = UInt32(self.size!.width)
+        uniforms[0].height = UInt32(self.size!.height)
+        uniforms[0].camera.position = vector_float3(0, 0, -2)
+        uniforms[0].camera.forward = vector_float3(0, 0, 1)
+        uniforms[0].camera.up = vector_float3(0, 1, 0)
+        uniforms[0].camera.right = vector_float3(1, 0, 0)
         //rotation += 0.01
     }
     
@@ -242,21 +407,31 @@ class Renderer: NSObject, MTKViewDelegate {
         switch scalarSize {
         case .BITS_8:
             if self.octreeUInt8 != nil {
-                let bricks: [Brick<UInt8>]? = (self.octreeUInt8?.findNodeCut(cameraPos: vector_double3(0, 0, -8), c: c))
-                for brick in bricks! {
-                    print("\(brick)")
-                }
+                self.bricks8Cut = (self.octreeUInt8?.findNodeCut(cameraPos: vector_double3(0, 0, -2), c: c))!
             }
         case .BITS_16:
             if self.octreeUInt16 != nil {
-                let bricks: [Brick<UInt16>] = (self.octreeUInt16?.findNodeCut(cameraPos: vector_double3(0, 0, -8), c: c))!
-                for brick in bricks {
-                    print("\(brick)")
-                }
+                self.bricks16Cut = (self.octreeUInt16?.findNodeCut(cameraPos: vector_double3(0, 0, -2), c: c))!
             }
         }
     }
+    
+    private func transferWorkingSet() {
+        switch scalarSize {
+        case .BITS_8:
+            for (idx, brick) in bricks8Cut.enumerated() {
+                let x = idx % (8 * 9)
+                let y = (idx / 8) % 9
+                let z = idx / 64
+                let region = MTLRegionMake3D(x, y, z, 128, 128, 128)
+                self.brickPool!.replace(region: region, mipmapLevel: 0, slice: 0, withBytes: brick.scalars, bytesPerRow: 128, bytesPerImage: 128 * 128)
+            }
 
+       case .BITS_16:
+            print("TBD")
+        }
+    }
+    
     func draw(in view: MTKView) {
         /// Per frame updates hare
 
@@ -279,62 +454,101 @@ class Renderer: NSObject, MTKViewDelegate {
             self.updateGameState()
             
             self.generateWorkingSet()
+            if(self.brickPool != nil) {
+                self.transferWorkingSet()
+            }
+            
+            let accStructEncoder = commandBuffer.makeAccelerationStructureCommandEncoder()!
+            
+            accStructEncoder.build(accelerationStructure: self.accStruct!, descriptor: self.accStructDesc!, scratchBuffer: self.scratchBuffer!, scratchBufferOffset: 0)
+            
+            accStructEncoder.endEncoding()
+            
+            let width = Int(self.size!.width)
+            let height = Int(self.size!.height)
+            
+            let threadsPerThreadgroup = MTLSizeMake(8, 8, 1)
+            let threadgroups = MTLSizeMake((width  + threadsPerThreadgroup.width  - 1) / threadsPerThreadgroup.width,
+                                               (height + threadsPerThreadgroup.height - 1) / threadsPerThreadgroup.height,
+                                               1);
+            
+            let computeEncoder = commandBuffer.makeComputeCommandEncoder()!
+            
+            computeEncoder.setAccelerationStructure(self.accStruct!, bufferIndex: 0)
+            computeEncoder.setIntersectionFunctionTable(self.intersectionFunctionTable, bufferIndex: 1)
+            
+            computeEncoder.setBuffer(dynamicUniformBuffer, offset: 0, index: 2)
+            
+            computeEncoder.setComputePipelineState(rtPipelineState!)
+            
+            computeEncoder.setTexture(accumulationTargets[accumulationTargetIdx], index: 0)
+            computeEncoder.setTexture(self.brickPool, index: TextureIndex.BrickPoolIndex.rawValue)
+            computeEncoder.useResource(self.accStruct!, usage: .read)
+            
+            computeEncoder.dispatchThreadgroups(threadgroups, threadsPerThreadgroup: threadsPerThreadgroup)
+            
+            computeEncoder.endEncoding()
             
             /// Delay getting the currentRenderPassDescriptor until we absolutely need it to avoid
             ///   holding onto the drawable and blocking the display pipeline any longer than necessary
             let renderPassDescriptor = view.currentRenderPassDescriptor
-            
+
             if let renderPassDescriptor = renderPassDescriptor {
-                
+
                 /// Final pass rendering code here
                 if let renderEncoder = commandBuffer.makeRenderCommandEncoder(descriptor: renderPassDescriptor) {
                     renderEncoder.label = "Primary Render Encoder"
-                    
-                    renderEncoder.pushDebugGroup("Draw Box")
-                    
-                    renderEncoder.setCullMode(.back)
-                    
-                    renderEncoder.setFrontFacing(.counterClockwise)
-                    
-                    renderEncoder.setRenderPipelineState(pipelineState)
-                    
-                    renderEncoder.setDepthStencilState(depthState)
-                    
-                    renderEncoder.setVertexBuffer(dynamicUniformBuffer, offset:uniformBufferOffset, index: BufferIndex.uniforms.rawValue)
-                    renderEncoder.setFragmentBuffer(dynamicUniformBuffer, offset:uniformBufferOffset, index: BufferIndex.uniforms.rawValue)
-                    
-                    for (index, element) in mesh.vertexDescriptor.layouts.enumerated() {
-                        guard let layout = element as? MDLVertexBufferLayout else {
-                            return
-                        }
-                        
-                        if layout.stride != 0 {
-                            let buffer = mesh.vertexBuffers[index]
-                            renderEncoder.setVertexBuffer(buffer.buffer, offset:buffer.offset, index: index)
-                        }
-                    }
-                    
-                    renderEncoder.setFragmentTexture(colorMap, index: TextureIndex.color.rawValue)
-                    
-                    for submesh in mesh.submeshes {
-                        renderEncoder.drawIndexedPrimitives(type: submesh.primitiveType,
-                                                            indexCount: submesh.indexCount,
-                                                            indexType: submesh.indexType,
-                                                            indexBuffer: submesh.indexBuffer.buffer,
-                                                            indexBufferOffset: submesh.indexBuffer.offset)
-                        
-                    }
-                    
+
+                    renderEncoder.pushDebugGroup("Draw Compute Output")
+//
+//                    renderEncoder.setCullMode(.front)
+//
+//                    renderEncoder.setFrontFacing(.counterClockwise)
+//
+//                    renderEncoder.setRenderPipelineState(pipelineState)
+//
+//                    renderEncoder.setDepthStencilState(depthState)
+//
+//                    renderEncoder.setVertexBuffer(dynamicUniformBuffer, offset:uniformBufferOffset, index: BufferIndex.uniforms.rawValue)
+//                    renderEncoder.setFragmentBuffer(dynamicUniformBuffer, offset:uniformBufferOffset, index: BufferIndex.uniforms.rawValue)
+//
+//                    for (index, element) in mesh.vertexDescriptor.layouts.enumerated() {
+//                        guard let layout = element as? MDLVertexBufferLayout else {
+//                            return
+//                        }
+//
+//                        if layout.stride != 0 {
+//                            let buffer = mesh.vertexBuffers[index]
+//                            renderEncoder.setVertexBuffer(buffer.buffer, offset:buffer.offset, index: index)
+//                        }
+//                    }
+//
+//                    renderEncoder.setFragmentTexture(colorMap, index: TextureIndex.TextureIndexColor.rawValue)
+//                    renderEncoder.setFragmentTexture(self.brickPool, index: TextureIndex.BrickPoolIndex.rawValue)
+//
+//                    for submesh in mesh.submeshes {
+//                        renderEncoder.drawIndexedPrimitives(type: submesh.primitiveType,
+//                                                            indexCount: submesh.indexCount,
+//                                                            indexType: submesh.indexType,
+//                                                            indexBuffer: submesh.indexBuffer.buffer,
+//                                                            indexBufferOffset: submesh.indexBuffer.offset)
+//
+//                    }
+//
                     renderEncoder.popDebugGroup()
-                    
+
+                    accumulationTargetIdx = 1 - accumulationTargetIdx
+                    renderEncoder.setRenderPipelineState(pipelineState)
+                    renderEncoder.setFragmentTexture(accumulationTargets[accumulationTargetIdx], index: 0)
+                    renderEncoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 6)
                     renderEncoder.endEncoding()
-                    
+
                     if let drawable = view.currentDrawable {
                         commandBuffer.present(drawable)
                     }
                 }
-            }
-            
+           }
+
             commandBuffer.commit()
         }
     }
@@ -342,8 +556,21 @@ class Renderer: NSObject, MTKViewDelegate {
     func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {
         /// Respond to drawable size or orientation changes here
 
+        self.size = size
         let aspect = Float(size.width) / Float(size.height)
         projectionMatrix = matrix_perspective_right_hand(fovyRadians: radians_from_degrees(65), aspectRatio:aspect, nearZ: 0.1, farZ: 100.0)
+        
+        let textureDesc = MTLTextureDescriptor()
+        textureDesc.pixelFormat = .rgba32Float
+        textureDesc.textureType = .type2D
+        textureDesc.width = Int(size.width)
+        textureDesc.height = Int(size.height)
+        textureDesc.usage = [.shaderWrite, .shaderRead]
+        
+        accumulationTargets.removeAll()
+        for _ in 0..<2 {
+            accumulationTargets.append(self.device.makeTexture(descriptor: textureDesc)!)
+        }
     }
 }
 
