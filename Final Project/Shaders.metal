@@ -49,15 +49,15 @@ fragment float4 fragmentShader(ColorInOut in [[stage_in]],
     constexpr sampler colorSampler(mip_filter::linear,
                                    mag_filter::linear);
 
-    float3 sampleCoord = float3(in.texCoord.x / 8.0, in.texCoord.y / 8.0, 0);
-    float sample = brickPool.sample(colorSampler, sampleCoord).r / 256.0;
-    float4 color;
-    color = float4(sample, sample, sample, 1);
+    float3 sampleCoord = float3(in.texCoord.x, in.texCoord.y, 0);
+    //float sample = brickPool.sample(colorSampler, sampleCoord).r / 256.0;
+    half4 sample = colorMap.sample(colorSampler, sampleCoord.xy);
+    float4 color = float4(sample);
     
     return color;
 }
 
-struct BoundingBoxResult {
+struct IntersectionResult {
     bool didIntercept [[accept_intersection]];
     float dist [[distance]];
 };
@@ -67,8 +67,8 @@ struct Box {
     float3 boxMax;
 };
 
-[[intersection(bounding_box, triangle_data, instancing)]]
-BoundingBoxResult brickIntersectionFunc(float3 origin                      [[origin]],
+[[intersection(bounding_box)]]
+IntersectionResult brickIntersectionFunc(float3 origin                      [[origin]],
                                         float3 direction                   [[direction]],
                                         float minDistance                  [[min_distance]],
                                         float maxDistance                  [[max_distance]],
@@ -81,12 +81,12 @@ BoundingBoxResult brickIntersectionFunc(float3 origin                      [[ori
     Box bbox = boundingBoxes[primitiveIndex];
     float3 t1 = (bbox.boxMin - origin) / direction;
     float3 t2 = (bbox.boxMax - origin) / direction;
-    
+
     float3 tmin = min(t1.x, t2.x);
     float3 tmax = max(t1.x, t2.x);
-    
+
     bool intersected = min3(tmax.x, tmax.y, tmax.z) > max3(tmin.x, tmin.y, tmin.z);
-    
+
     float3 intPoint;
     if(!intersected) {
         return { false, 0.0f };
@@ -102,10 +102,8 @@ BoundingBoxResult brickIntersectionFunc(float3 origin                      [[ori
     return { true, dist };
 }
 
-kernel void interceptBricks(instance_acceleration_structure accStruct [[buffer(0)]],
-                            primitive_acceleration_structure primStruct [[buffer(1)]],
-                            intersection_function_table<triangle_data, instancing> functionTable [[buffer(2)]],
-                            constant Uniforms & uniforms [[buffer(3)]],
+kernel void interceptBricks(acceleration_structure<> primStruct [[buffer(0)]],
+                            constant Uniforms & uniforms [[buffer(1)]],
                             texture2d<float, access::write> dstTex [[texture(0)]],
                             texture3d<uint> brickPool [[texture(BrickPoolIndex)]],
                             uint2 tid [[thread_position_in_grid]])
@@ -124,41 +122,51 @@ kernel void interceptBricks(instance_acceleration_structure accStruct [[buffer(0
         constant Camera & camera = uniforms.camera;
         
         r.origin = camera.position;
-        r.direction = normalize(uv.x * camera.right + uv.y * camera.up + camera.forward);
+        r.direction = normalize((uv.x - 0.5) * camera.right + (uv.y - 0.5) * camera.up + camera.forward);
         r.max_distance = INFINITY;
         
-        intersector<triangle_data, instancing> intersector;
+        intersector<triangle_data> intersector;
+        intersection_result<triangle_data> intersection;
         
-        intersection_result<triangle_data, instancing> intersection;
+//        intersector<triangle_data, instancing> intersector;
+//        intersection_result<triangle_data, instancing> intersection;
         
-        float3 intersectionPoint;
+        //float3 intersectionPoint;
         
-        intersection = intersector.intersect(r, accStruct, 3, functionTable, intersectionPoint);
+        intersection = intersector.intersect(r, primStruct);
+        //intersection = intersector.intersect(r, instStruct, 3, functionTable, intersectionPoint);
         
         if( intersection.type == intersection_type::none) {
-            dstTex.write(float4(uv.x, uv.y, 1, 1), tid);
+            dstTex.write(float4(0, 0, 0, 1), tid);
             return;
         }
         
-        unsigned int geometryIndex = intersection.geometry_id;
-        
+        //unsigned int geometryIndex = intersection.geometry_id;
+        //float2 geometryIndex = intersection.triangle_barycentric_coord;
+
         // Convert geometry index to brick pool coordinate
-        float3 xyzStart = float3( (geometryIndex % (8 * 9)) / 8.0, ((geometryIndex / 8) % 9) / 8.0, (geometryIndex / 64) / 9.0);
-        float3 xyzEnd = float3( ((geometryIndex + 1) % (8 * 9)) / 8.0, (((geometryIndex + 1) / 8) % 9) / 8.0, ((geometryIndex + 1)/ 64) / 9.0);
-        
-        float3 xyz = xyzStart;
-        
+        //float3 xyzStart = r.origin + r.direction * intersection.distance;
+        //float3 xyzEnd = float3( ((geometryIndex + 1) % (8 * 9)) / 8.0, (((geometryIndex + 1) / 8) % 9) / 8.0, ((geometryIndex + 1)/ 64) / 9.0);
+
+        float3 xyz = r.origin + r.direction * intersection.distance;
+        xyz.x += 0.5;
+        xyz.y += 0.5;
+
         float sample = brickPool.sample(colorSampler, xyz).r;
-        
-        while(sample < 78 || distance(xyz, xyzEnd) != 0) {
-            // March ray
-            xyz += r.direction * 0.125; // 1/8
+        float4 sampleColor = float4(0, 0, 0, 1);
+
+        while(xyz.z < 1.0) {
+            
+            xyz += r.direction * 0.00390625;
             sample = brickPool.sample(colorSampler, xyz).r;
+            if(sample > 167) {
+                float val = sample / 256.0;
+                sampleColor = float4(val, val, val, 1);
+                break;
+            }
         }
         
-        float sampleColor = sample / 256.0;
-        
-        dstTex.write(float4(sampleColor, sampleColor, sampleColor, 1), tid);
+        dstTex.write(sampleColor, tid);
     }
 }
 

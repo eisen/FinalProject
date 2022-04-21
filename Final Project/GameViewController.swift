@@ -66,27 +66,24 @@ class GameViewController: NSViewController, NSOpenSavePanelDelegate {
         
         if myFileDialog.runModal() == .OK {
             let url = myFileDialog.url!
-            let width = self.rawView.GetWidth()
-            let height = self.rawView.GetHeight()
-            let depth = self.rawView.GetDepth()
+            let width = Int32(self.rawView.GetWidth())
+            let height = Int32(self.rawView.GetHeight())
+            let depth = Int32(self.rawView.GetDepth())
             
-            self.ShowProgress()
+            //self.ShowProgress()
             
-//            DispatchQueue.global(qos: .userInitiated).async {
-                let isoValues = IsoFeatures.GetIsoValues(url: url.path, dim: vector_int3(x: Int32(width), y: Int32(height), z: Int32(depth)), scalarSize: self.rawView.GetScalarSize())
-                print(isoValues)
-//            }
+            //IsoFeatures.GetIsoValues(url: url.path, dim: vector_int3(x: Int32(width), y: Int32(height), z: Int32(depth)), scalarSize: self.rawView.GetScalarSize())
             
             switch self.rawView.GetScalarSize() {
             case .BITS_16:
-                self.renderer.SetScalarSize(size: .BITS_16)
+                //self.renderer.SetScalarSize(size: .BITS_16)
                 self.loadVolumeSet16(datFile: url, width: width, height: height, depth: depth)
             case .BITS_8:
-                self.renderer.SetScalarSize(size: .BITS_8)
+                //self.renderer.SetScalarSize(size: .BITS_8)
                 self.loadVolumeSet8(datFile: url, width: width, height: height, depth: depth)
             }
         } else {
-            self.HideProgress()
+            //self.HideProgress()
         }
     }
     
@@ -105,98 +102,99 @@ class GameViewController: NSViewController, NSOpenSavePanelDelegate {
         print("\(String(describing: fileURL))")
     }
     
-    func loadVolumeSet16(datFile: URL, width: Int, height: Int, depth: Int) {
+    func loadVolumeSet16(datFile: URL, width: Int32, height: Int32, depth: Int32) {
         var data: Data?
         do {
             data = try Data.init(contentsOf: datFile)
+            self.renderer.setVolumeData16(data: data!, dim: vector_int3(width, height, depth))
         } catch {
             print(error)
         }
         
-        if ( width * height * depth * 2 != data?.count) {
-            ShowAlert()
-            return
-        }
-        
-        let brickDim = 128
-        
-        var maxDim = max(width, height, depth)
-        
-        maxDim = Int(pow(2.0, ceil(log(Double(maxDim))/log(2))))
-        
-        let bricksPerDim = maxDim / brickDim
-        
-        let boxDim = Double(maxDim - 1)
-        let bBox = Box(boxMin: vector3(0,0,0), boxMax: vector3(boxDim, boxDim, boxDim))
-        let ocTree: Octree<Brick<UInt16>, UInt16> = Octree<Brick<UInt16>, UInt16>(boundingBox: bBox, minimumCellSize: Double(brickDim))
-        
-        let brickCenter = Double(brickDim / 2)
-        var bricks: [Brick<UInt16>] = []
-        
-        progressBar.doubleValue = 0
-        let bricksCount = pow(Double(bricksPerDim), Double(3))
-        progressBar.maxValue = Double( bricksCount + 3)
-        progressStatus.stringValue = "Extracting brick 1 of \(Int(bricksCount))..."
-        
-        DispatchQueue.global(qos: .userInitiated).async {
-
-            let start = CFAbsoluteTimeGetCurrent()
-            
-            for xStep in 0..<bricksPerDim {
-                for yStep in 0..<bricksPerDim {
-                    for zStep in 0..<bricksPerDim {
-                        let xCenter = Double(xStep * brickDim) + brickCenter
-                        let yCenter = Double(yStep * brickDim) + brickCenter
-                        let zCenter = Double(zStep * brickDim) + brickCenter
-                        let brick = Brick<UInt16>(dataset: data, datasetSize: vector3(Double(width), Double(height), Double(depth)), position: vector3(xCenter, yCenter, zCenter), size: brickDim)
-                        bricks.append(brick)
-                        DispatchQueue.main.async {
-                            self.progressBar.doubleValue += 1
-                            self.progressStatus.stringValue = String(format:"Extracting brick %.0f of %.0f...", self.progressBar.doubleValue + 1, bricksCount)
-                        }
-                    }
-                }
-            }
-            
-            DispatchQueue.main.async {
-                self.progressStatus.stringValue = "Adding bricks to Octree..."
-            }
-            for idx in 0..<bricks.count {
-                ocTree.add(bricks[idx], at: bricks[idx].getPosition())
-                
-            }
-            
-            DispatchQueue.main.async {
-                self.progressBar.doubleValue += 1
-            }
-            
-            DispatchQueue.main.async {
-                self.progressStatus.stringValue = "Generating brick LODs..."
-            }
-            
-            ocTree.generateLODs()
-            
-            DispatchQueue.main.async {
-                self.progressBar.doubleValue += 1
-            }
-            
-            let end = CFAbsoluteTimeGetCurrent()
-            print("Took \(end-start) seconds")
-            
-//            DispatchQueue.main.async {
-//                self.progressStatus.stringValue = "Exporting bricks..."
-//            }
+//        if ( width * height * depth * 2 != data?.count) {
+//            ShowAlert()
+//            return
+//        }
+//        
+//        let brickDim = 128
+//        
+//        var maxDim = max(width, height, depth)
+//        
+//        maxDim = Int(pow(2.0, ceil(log(Double(maxDim))/log(2))))
+//        
+//        let bricksPerDim = maxDim / brickDim
+//        
+//        let boxDim = Double(maxDim - 1)
+//        let bBox = Box(boxMin: vector3(0,0,0), boxMax: vector3(boxDim, boxDim, boxDim))
+//        let ocTree: Octree<Brick<UInt16>, UInt16> = Octree<Brick<UInt16>, UInt16>(boundingBox: bBox, minimumCellSize: Double(brickDim))
+//        
+//        let brickCenter = Double(brickDim / 2)
+//        var bricks: [Brick<UInt16>] = []
+//        
+//        progressBar.doubleValue = 0
+//        let bricksCount = pow(Double(bricksPerDim), Double(3))
+//        progressBar.maxValue = Double( bricksCount + 3)
+//        progressStatus.stringValue = "Extracting brick 1 of \(Int(bricksCount))..."
+//        
+//        DispatchQueue.global(qos: .userInitiated).async {
 //
-//            ocTree.exportBricks(folder: datFile.baseURL!)
-            
-            DispatchQueue.main.async {
-                self.HideProgress()
-            }
-            
-            //print(ocTree)
-            
-            self.renderer.setOctreeUInt16(ocTree: ocTree)
-        }
+//            let start = CFAbsoluteTimeGetCurrent()
+//            
+//            for xStep in 0..<bricksPerDim {
+//                for yStep in 0..<bricksPerDim {
+//                    for zStep in 0..<bricksPerDim {
+//                        let xCenter = Double(xStep * brickDim) + brickCenter
+//                        let yCenter = Double(yStep * brickDim) + brickCenter
+//                        let zCenter = Double(zStep * brickDim) + brickCenter
+//                        let brick = Brick<UInt16>(dataset: data, datasetSize: vector3(Double(width), Double(height), Double(depth)), position: vector3(xCenter, yCenter, zCenter), size: brickDim)
+//                        bricks.append(brick)
+//                        DispatchQueue.main.async {
+//                            self.progressBar.doubleValue += 1
+//                            self.progressStatus.stringValue = String(format:"Extracting brick %.0f of %.0f...", self.progressBar.doubleValue + 1, bricksCount)
+//                        }
+//                    }
+//                }
+//            }
+//            
+//            DispatchQueue.main.async {
+//                self.progressStatus.stringValue = "Adding bricks to Octree..."
+//            }
+//            for idx in 0..<bricks.count {
+//                ocTree.add(bricks[idx], at: bricks[idx].getPosition())
+//                
+//            }
+//            
+//            DispatchQueue.main.async {
+//                self.progressBar.doubleValue += 1
+//            }
+//            
+//            DispatchQueue.main.async {
+//                self.progressStatus.stringValue = "Generating brick LODs..."
+//            }
+//            
+//            ocTree.generateLODs()
+//            
+//            DispatchQueue.main.async {
+//                self.progressBar.doubleValue += 1
+//            }
+//            
+//            let end = CFAbsoluteTimeGetCurrent()
+//            print("Took \(end-start) seconds")
+//            
+////            DispatchQueue.main.async {
+////                self.progressStatus.stringValue = "Exporting bricks..."
+////            }
+////
+////            ocTree.exportBricks(folder: datFile.baseURL!)
+//            
+//            DispatchQueue.main.async {
+//                self.HideProgress()
+//            }
+//            
+//            //print(ocTree)
+//            
+//            self.renderer.setOctreeUInt16(ocTree: ocTree)
+//        }
     }
     
     private func ShowAlert() {
@@ -211,95 +209,96 @@ class GameViewController: NSViewController, NSOpenSavePanelDelegate {
         HideProgress()
     }
     
-    func loadVolumeSet8(datFile: URL, width: Int, height: Int, depth: Int) {
+    func loadVolumeSet8(datFile: URL, width: Int32, height: Int32, depth: Int32) {
         
-        progressStatus.stringValue = "Converting \(datFile.path)..."
+        //progressStatus.stringValue = "Converting \(datFile.path)..."
         
         var data: Data?
         do{
             data = try Data.init(contentsOf: datFile)
+            self.renderer.setVolumeData8(data: data!, dim: vector_int3(width, height, depth))
         } catch {
             print(error)
         }
         
-        if ( width * height * depth != data?.count) {
-            ShowAlert()
-            return
-        }
-        
-        let brickDim = 128
-        
-        var maxDim = max(width, height, depth)
-        
-        maxDim = Int(pow(2.0, ceil(log(Double(maxDim))/log(2))))
-        
-        let bricksPerDim = maxDim / brickDim
-        
-        let boxDim = Double(maxDim - 1)
-        let bBox = Box(boxMin: vector3(0,0,0), boxMax: vector3(boxDim, boxDim, boxDim))
-        let ocTree: Octree<Brick<UInt8>, UInt8> = Octree<Brick<UInt8>, UInt8>(boundingBox: bBox, minimumCellSize: Double(brickDim))
-        
-        let brickCenter = Double(brickDim / 2)
-        var bricks: [Brick<UInt8>] = []
-        
-        progressBar.doubleValue = 0
-        let bricksCount = pow(Double(bricksPerDim), Double(3))
-        progressBar.maxValue = Double( bricksCount + 3)
-        progressStatus.stringValue = "Extracting brick 1 of \(Int(bricksCount))..."
-        
-        DispatchQueue.global(qos: .userInitiated).async {
-            let start = CFAbsoluteTimeGetCurrent()
-            
-            for xStep in 0..<bricksPerDim {
-                for yStep in 0..<bricksPerDim {
-                    for zStep in 0..<bricksPerDim {
-                        let xCenter = Double(xStep * brickDim) + brickCenter
-                        let yCenter = Double(yStep * brickDim) + brickCenter
-                        let zCenter = Double(zStep * brickDim) + brickCenter
-                        let brick = Brick<UInt8>(dataset: data, datasetSize: vector3(Double(width), Double(height), Double(depth)), position: vector3(xCenter, yCenter, zCenter), size: brickDim)
-                        bricks.append(brick)
-                        DispatchQueue.main.async {
-                            self.progressBar.doubleValue += 1
-                            self.progressStatus.stringValue = String(format:"Extracting brick %.0f of %.0f...", self.progressBar.doubleValue, bricksCount)
-                        }
-                    }
-                }
-            }
-            
-            DispatchQueue.main.async {
-                self.progressStatus.stringValue = "Adding bricks to Octree..."
-            }
-            for idx in 0..<bricks.count {
-                ocTree.add(bricks[idx], at: bricks[idx].getPosition())
-            }
-            DispatchQueue.main.async {
-                self.progressBar.doubleValue += 1
-            }
-            
-            DispatchQueue.main.async {
-                self.progressStatus.stringValue = "Generating brick LODs..."
-            }
-            ocTree.generateLODs()
-            DispatchQueue.main.async {
-                self.progressBar.doubleValue += 1
-            }
-            
-            let end = CFAbsoluteTimeGetCurrent()
-            print("Took \(end-start) seconds")
-            
-//            DispatchQueue.main.async {
-//                self.progressStatus.stringValue = "Exporting bricks..."
+//        if ( width * height * depth != data?.count) {
+//            ShowAlert()
+//            return
+//        }
+//
+//        let brickDim = 128
+//
+//        var maxDim = max(width, height, depth)
+//
+//        maxDim = Int(pow(2.0, ceil(log(Double(maxDim))/log(2))))
+//
+//        let bricksPerDim = maxDim / brickDim
+//
+//        let boxDim = Double(maxDim - 1)
+//        let bBox = Box(boxMin: vector3(0,0,0), boxMax: vector3(boxDim, boxDim, boxDim))
+//        let ocTree: Octree<Brick<UInt8>, UInt8> = Octree<Brick<UInt8>, UInt8>(boundingBox: bBox, minimumCellSize: Double(brickDim))
+//
+//        let brickCenter = Double(brickDim / 2)
+//        var bricks: [Brick<UInt8>] = []
+//
+//        progressBar.doubleValue = 0
+//        let bricksCount = pow(Double(bricksPerDim), Double(3))
+//        progressBar.maxValue = Double( bricksCount + 3)
+//        progressStatus.stringValue = "Extracting brick 1 of \(Int(bricksCount))..."
+//
+//        DispatchQueue.global(qos: .userInitiated).async {
+//            let start = CFAbsoluteTimeGetCurrent()
+//
+//            for xStep in 0..<bricksPerDim {
+//                for yStep in 0..<bricksPerDim {
+//                    for zStep in 0..<bricksPerDim {
+//                        let xCenter = Double(xStep * brickDim) + brickCenter
+//                        let yCenter = Double(yStep * brickDim) + brickCenter
+//                        let zCenter = Double(zStep * brickDim) + brickCenter
+//                        let brick = Brick<UInt8>(dataset: data, datasetSize: vector3(Double(width), Double(height), Double(depth)), position: vector3(xCenter, yCenter, zCenter), size: brickDim)
+//                        bricks.append(brick)
+//                        DispatchQueue.main.async {
+//                            self.progressBar.doubleValue += 1
+//                            self.progressStatus.stringValue = String(format:"Extracting brick %.0f of %.0f...", self.progressBar.doubleValue, bricksCount)
+//                        }
+//                    }
+//                }
 //            }
 //
-//            ocTree.exportBricks(folder: URL(fileURLWithPath: datFile.path).deletingLastPathComponent())
-            
-            DispatchQueue.main.async {
-                self.HideProgress()
-            }
-            
-            //print(ocTree)
-            
-            self.renderer.setOctreeUInt8(ocTree: ocTree)
-        }
+//            DispatchQueue.main.async {
+//                self.progressStatus.stringValue = "Adding bricks to Octree..."
+//            }
+//            for idx in 0..<bricks.count {
+//                ocTree.add(bricks[idx], at: bricks[idx].getPosition())
+//            }
+//            DispatchQueue.main.async {
+//                self.progressBar.doubleValue += 1
+//            }
+//
+//            DispatchQueue.main.async {
+//                self.progressStatus.stringValue = "Generating brick LODs..."
+//            }
+//            ocTree.generateLODs()
+//            DispatchQueue.main.async {
+//                self.progressBar.doubleValue += 1
+//            }
+//
+//            let end = CFAbsoluteTimeGetCurrent()
+//            print("Took \(end-start) seconds")
+//
+////            DispatchQueue.main.async {
+////                self.progressStatus.stringValue = "Exporting bricks..."
+////            }
+////
+////            ocTree.exportBricks(folder: URL(fileURLWithPath: datFile.path).deletingLastPathComponent())
+//
+//            DispatchQueue.main.async {
+//                self.HideProgress()
+//            }
+//
+//            //print(ocTree)
+//
+//            self.renderer.setOctreeUInt8(ocTree: ocTree)
+//        }
     }
 }
