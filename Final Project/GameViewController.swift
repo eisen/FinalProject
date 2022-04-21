@@ -72,6 +72,11 @@ class GameViewController: NSViewController, NSOpenSavePanelDelegate {
             
             self.ShowProgress()
             
+//            DispatchQueue.global(qos: .userInitiated).async {
+                let isoValues = IsoFeatures.GetIsoValues(url: url.path, dim: vector_int3(x: Int32(width), y: Int32(height), z: Int32(depth)), scalarSize: self.rawView.GetScalarSize())
+                print(isoValues)
+//            }
+            
             switch self.rawView.GetScalarSize() {
             case .BITS_16:
                 self.renderer.SetScalarSize(size: .BITS_16)

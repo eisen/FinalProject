@@ -11,6 +11,8 @@
 		9F28DEFD2800A85600362E61 /* Brick.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F28DEFC2800A85600362E61 /* Brick.swift */; };
 		9F28DEFF2800A86E00362E61 /* MacroCell.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F28DEFE2800A86E00362E61 /* MacroCell.swift */; };
 		9F34817C2809059E0014D3FE /* FPS.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F34817A2809059E0014D3FE /* FPS.swift */; };
+		9F6E73252810CA7300EF9469 /* IsoFeatures.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F6E73242810CA7300EF9469 /* IsoFeatures.swift */; };
+		9F6E732C2810CB8E00EF9469 /* PythonKit in Frameworks */ = {isa = PBXBuildFile; productRef = 9F6E732B2810CB8E00EF9469 /* PythonKit */; };
 		9F814A2C280519A800AA35FD /* RawView.xib in Resources */ = {isa = PBXBuildFile; fileRef = 9F814A2B280519A800AA35FD /* RawView.xib */; };
 		9F814A2E28051BD600AA35FD /* RawView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F814A2D28051BD600AA35FD /* RawView.swift */; };
 		9F93D2DA27FA44D600654019 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F93D2D927FA44D600654019 /* AppDelegate.swift */; };
@@ -19,6 +21,7 @@
 		9F93D2E027FA44D600654019 /* Shaders.metal in Sources */ = {isa = PBXBuildFile; fileRef = 9F93D2DF27FA44D600654019 /* Shaders.metal */; };
 		9F93D2E327FA44D700654019 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 9F93D2E227FA44D700654019 /* Assets.xcassets */; };
 		9F93D2E627FA44D700654019 /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 9F93D2E427FA44D700654019 /* Main.storyboard */; };
+		9FCBBCC52810D02B00B1864E /* IsoFeatures.py in Resources */ = {isa = PBXBuildFile; fileRef = 9FCBBCC42810D02B00B1864E /* IsoFeatures.py */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -26,9 +29,10 @@
 		9F28DEFC2800A85600362E61 /* Brick.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Brick.swift; sourceTree = "<group>"; };
 		9F28DEFE2800A86E00362E61 /* MacroCell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacroCell.swift; sourceTree = "<group>"; };
 		9F34817A2809059E0014D3FE /* FPS.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FPS.swift; sourceTree = "<group>"; };
+		9F6E73242810CA7300EF9469 /* IsoFeatures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IsoFeatures.swift; sourceTree = "<group>"; };
 		9F814A2B280519A800AA35FD /* RawView.xib */ = {isa = PBXFileReference; lastKnownFileType = file.xib; path = RawView.xib; sourceTree = "<group>"; };
 		9F814A2D28051BD600AA35FD /* RawView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RawView.swift; sourceTree = "<group>"; };
-		9F93D2D627FA44D600654019 /* Final Project.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Final Project.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		9F93D2D627FA44D600654019 /* Final_Project.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Final_Project.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		9F93D2D927FA44D600654019 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		9F93D2DB27FA44D600654019 /* GameViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameViewController.swift; sourceTree = "<group>"; };
 		9F93D2DD27FA44D600654019 /* Renderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Renderer.swift; sourceTree = "<group>"; };
@@ -37,6 +41,7 @@
 		9F93D2E227FA44D700654019 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		9F93D2E527FA44D700654019 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
 		9F93D2E727FA44D700654019 /* Final_Project.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Final_Project.entitlements; sourceTree = "<group>"; };
+		9FCBBCC42810D02B00B1864E /* IsoFeatures.py */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.script.python; path = IsoFeatures.py; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -44,6 +49,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				9F6E732C2810CB8E00EF9469 /* PythonKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -62,7 +68,7 @@
 		9F93D2D727FA44D600654019 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				9F93D2D627FA44D600654019 /* Final Project.app */,
+				9F93D2D627FA44D600654019 /* Final_Project.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -84,6 +90,8 @@
 				9F814A2B280519A800AA35FD /* RawView.xib */,
 				9F814A2D28051BD600AA35FD /* RawView.swift */,
 				9F34817A2809059E0014D3FE /* FPS.swift */,
+				9F6E73242810CA7300EF9469 /* IsoFeatures.swift */,
+				9FCBBCC42810D02B00B1864E /* IsoFeatures.py */,
 			);
 			path = "Final Project";
 			sourceTree = "<group>";
@@ -111,8 +119,11 @@
 			dependencies = (
 			);
 			name = "Final Project";
+			packageProductDependencies = (
+				9F6E732B2810CB8E00EF9469 /* PythonKit */,
+			);
 			productName = "Final Project";
-			productReference = 9F93D2D627FA44D600654019 /* Final Project.app */;
+			productReference = 9F93D2D627FA44D600654019 /* Final_Project.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -139,6 +150,9 @@
 				Base,
 			);
 			mainGroup = 9F93D2CD27FA44D600654019;
+			packageReferences = (
+				9F6E732A2810CB8E00EF9469 /* XCRemoteSwiftPackageReference "PythonKit" */,
+			);
 			productRefGroup = 9F93D2D727FA44D600654019 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -156,6 +170,7 @@
 				9F93D2E327FA44D700654019 /* Assets.xcassets in Resources */,
 				9F814A2C280519A800AA35FD /* RawView.xib in Resources */,
 				9F93D2E627FA44D700654019 /* Main.storyboard in Resources */,
+				9FCBBCC52810D02B00B1864E /* IsoFeatures.py in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -166,6 +181,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				9F6E73252810CA7300EF9469 /* IsoFeatures.swift in Sources */,
 				9F34817C2809059E0014D3FE /* FPS.swift in Sources */,
 				9F93D2E027FA44D600654019 /* Shaders.metal in Sources */,
 				9F93D2DC27FA44D600654019 /* GameViewController.swift in Sources */,
@@ -326,7 +342,7 @@
 				);
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "edu.utah.CS6610.CS6635.Final-Project";
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_NAME = Final_Project;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_OBJC_BRIDGING_HEADER = "$(TARGET_NAME)/ShaderTypes.h";
 				SWIFT_VERSION = 5.0;
@@ -354,7 +370,7 @@
 				);
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "edu.utah.CS6610.CS6635.Final-Project";
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_NAME = Final_Project;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_OBJC_BRIDGING_HEADER = "$(TARGET_NAME)/ShaderTypes.h";
 				SWIFT_VERSION = 5.0;
@@ -383,6 +399,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		9F6E732A2810CB8E00EF9469 /* XCRemoteSwiftPackageReference "PythonKit" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/pvieito/PythonKit.git";
+			requirement = {
+				branch = master;
+				kind = branch;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		9F6E732B2810CB8E00EF9469 /* PythonKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 9F6E732A2810CB8E00EF9469 /* XCRemoteSwiftPackageReference "PythonKit" */;
+			productName = PythonKit;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 9F93D2CE27FA44D600654019 /* Project object */;
 }

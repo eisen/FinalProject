@@ -22,9 +22,9 @@ enum RendererError: Error {
     case badVertexDescriptor
 }
 
-public enum ScalarSize {
-    case BITS_8
-    case BITS_16
+public enum ScalarSize: Int {
+    case BITS_8 = 8
+    case BITS_16 = 16
 }
 
 class Renderer: NSObject, MTKViewDelegate {
@@ -70,10 +70,16 @@ class Renderer: NSObject, MTKViewDelegate {
     
     var accStructDesc: MTLPrimitiveAccelerationStructureDescriptor?
     
+    var instAccStructDesc: MTLInstanceAccelerationStructureDescriptor?
+    
     var accStruct: MTLAccelerationStructure?
     
+    var instAccStruct: MTLAccelerationStructure?
+    
     var scratchBuffer: MTLBuffer?
+    var instScratchBuffer: MTLBuffer?
     var bboxBuffer: MTLBuffer?
+    var instBuffer: MTLBuffer?
     
     var size: CGSize?
     
@@ -133,6 +139,7 @@ class Renderer: NSObject, MTKViewDelegate {
         var accStructs: [MTLAccelerationStructure] = []
         self.accStructDesc = MTLPrimitiveAccelerationStructureDescriptor()
         let geomDesc = MTLAccelerationStructureBoundingBoxGeometryDescriptor()
+        //let meshDesc = MTLAccelerationStructureGeometryDescriptor()
         
         var bbox = MTLAxisAlignedBoundingBox()
         
@@ -144,38 +151,49 @@ class Renderer: NSObject, MTKViewDelegate {
         
         geomDesc.boundingBoxBuffer = bboxBuffer
         geomDesc.boundingBoxCount = 1
+        geomDesc.intersectionFunctionTableOffset = 0
         
         self.accStructDesc?.geometryDescriptors = [ geomDesc ]
         
-        let sizes = self.device.accelerationStructureSizes(descriptor: accStructDesc!)
+        var sizes = self.device.accelerationStructureSizes(descriptor: accStructDesc!)
         self.accStruct = self.device.makeAccelerationStructure(size: sizes.accelerationStructureSize)
-        self.accStruct?.label = "Acceleration Structure"
+        self.accStruct?.label = "Primitive Acceleration Structure"
         self.scratchBuffer = self.device.makeBuffer(length: sizes.buildScratchBufferSize, options: .storageModePrivate)
-        self.scratchBuffer?.label = "Scratch Buffer"
+        self.scratchBuffer?.label = "Primitive Scratch Buffer"
         
         accStructs.append(self.accStruct!)
         
-        let instanceBuffer = device.makeBuffer(length: MemoryLayout<MTLAccelerationStructureInstanceDescriptor>.size, options: .storageModeManaged)
-        let instanceDesc: UnsafeMutablePointer<MTLAccelerationStructureInstanceDescriptor> = (instanceBuffer?.contents().assumingMemoryBound(to: MTLAccelerationStructureInstanceDescriptor.self))!
+        self.instBuffer = device.makeBuffer(length: MemoryLayout<MTLAccelerationStructureInstanceDescriptor>.size, options: .storageModeShared)
+        self.instBuffer?.label = "Instance Buffer"
+        let instanceDesc: UnsafeMutablePointer<MTLAccelerationStructureInstanceDescriptor> = (self.instBuffer?.contents().assumingMemoryBound(to: MTLAccelerationStructureInstanceDescriptor.self))!
         
         instanceDesc[0].accelerationStructureIndex = 0
         instanceDesc[0].options = .nonOpaque
         instanceDesc[0].intersectionFunctionTableOffset = 0
         
-        var destCols = instanceDesc[0].transformationMatrix.columns
+        //var destCols = instanceDesc[0].transformationMatrix.columns
         let srcCols = self.uniforms[0].modelViewMatrix.columns
         
-        destCols.0 = MTLPackedFloat3Make(srcCols.0.x, srcCols.0.y, srcCols.0.z)
-        destCols.1 = MTLPackedFloat3Make(srcCols.1.x, srcCols.1.y, srcCols.1.z)
-        destCols.2 = MTLPackedFloat3Make(srcCols.2.x, srcCols.2.y, srcCols.2.z)
-        destCols.3 = MTLPackedFloat3Make(srcCols.3.x, srcCols.3.y, srcCols.3.z)
-        instanceDesc[0].transformationMatrix.columns = destCols
-
-        let accelDescriptor = MTLInstanceAccelerationStructureDescriptor()
+        instanceDesc[0].transformationMatrix.columns.0 = MTLPackedFloat3Make(srcCols.0.x, srcCols.0.y, srcCols.0.z)
+        instanceDesc[0].transformationMatrix.columns.1 = MTLPackedFloat3Make(srcCols.1.x, srcCols.1.y, srcCols.1.z)
+        instanceDesc[0].transformationMatrix.columns.2 = MTLPackedFloat3Make(srcCols.2.x, srcCols.2.y, srcCols.2.z)
+        instanceDesc[0].transformationMatrix.columns.3 = MTLPackedFloat3Make(srcCols.3.x, srcCols.3.y, srcCols.3.z)
+        //instanceDesc[0].transformationMatrix.columns = destCols
         
-        accelDescriptor.instancedAccelerationStructures = accStructs
-        accelDescriptor.instanceCount = 1
-        accelDescriptor.instanceDescriptorBuffer = instanceBuffer
+        //self.instBuffer?.didModifyRange(0..<self.instBuffer!.length)
+        memcpy(self.instBuffer?.contents(), instanceDesc, self.instBuffer!.length * MemoryLayout<MTLAccelerationStructureInstanceDescriptor>.size)
+
+        self.instAccStructDesc = MTLInstanceAccelerationStructureDescriptor()
+        
+        self.instAccStructDesc!.instancedAccelerationStructures = accStructs
+        self.instAccStructDesc!.instanceCount = 1
+        self.instAccStructDesc!.instanceDescriptorBuffer = self.instBuffer
+        
+        sizes = self.device.accelerationStructureSizes(descriptor: instAccStructDesc!)
+        self.instAccStruct = self.device.makeAccelerationStructure(size: sizes.accelerationStructureSize)
+        self.instAccStruct?.label = "Instance Acceleration Structure"
+        self.instScratchBuffer = self.device.makeBuffer(length: sizes.buildScratchBufferSize, options: .storageModePrivate)
+        self.scratchBuffer?.label = "Instance Scratch Buffer"
     }
 
     init?(metalKitView: MTKView) {
@@ -209,6 +227,7 @@ class Renderer: NSObject, MTKViewDelegate {
         let depthStateDescriptor = MTLDepthStencilDescriptor()
         depthStateDescriptor.depthCompareFunction = MTLCompareFunction.less
         depthStateDescriptor.isDepthWriteEnabled = true
+        
         self.depthState = device.makeDepthStencilState(descriptor:depthStateDescriptor)!
 
         do {
@@ -226,6 +245,8 @@ class Renderer: NSObject, MTKViewDelegate {
         }
 
         super.init()
+        
+        self.updateGameState()
         
         self.createAccelerationDesc()
         
@@ -393,8 +414,10 @@ class Renderer: NSObject, MTKViewDelegate {
         let viewMatrix = matrix4x4_translation(0.0, 0.0, -2.0)
         uniforms[0].modelViewMatrix = simd_mul(viewMatrix, modelMatrix)
         
-        uniforms[0].width = UInt32(self.size!.width)
-        uniforms[0].height = UInt32(self.size!.height)
+        if(self.size != nil) {
+            uniforms[0].width = UInt32(self.size!.width)
+            uniforms[0].height = UInt32(self.size!.height)
+        }
         uniforms[0].camera.position = vector_float3(0, 0, -2)
         uniforms[0].camera.forward = vector_float3(0, 0, 1)
         uniforms[0].camera.up = vector_float3(0, 1, 0)
@@ -461,6 +484,7 @@ class Renderer: NSObject, MTKViewDelegate {
             let accStructEncoder = commandBuffer.makeAccelerationStructureCommandEncoder()!
             
             accStructEncoder.build(accelerationStructure: self.accStruct!, descriptor: self.accStructDesc!, scratchBuffer: self.scratchBuffer!, scratchBufferOffset: 0)
+            accStructEncoder.build(accelerationStructure: self.instAccStruct!, descriptor: self.instAccStructDesc!, scratchBuffer: self.instScratchBuffer!, scratchBufferOffset: 0)
             
             accStructEncoder.endEncoding()
             
@@ -474,15 +498,18 @@ class Renderer: NSObject, MTKViewDelegate {
             
             let computeEncoder = commandBuffer.makeComputeCommandEncoder()!
             
-            computeEncoder.setAccelerationStructure(self.accStruct!, bufferIndex: 0)
-            computeEncoder.setIntersectionFunctionTable(self.intersectionFunctionTable, bufferIndex: 1)
+            computeEncoder.setAccelerationStructure(self.instAccStruct!, bufferIndex: 0)
+            computeEncoder.setAccelerationStructure(self.accStruct, bufferIndex: 1)
+            computeEncoder.setIntersectionFunctionTable(self.intersectionFunctionTable, bufferIndex: 2)
             
-            computeEncoder.setBuffer(dynamicUniformBuffer, offset: 0, index: 2)
+            computeEncoder.setBuffer(dynamicUniformBuffer, offset: 0, index: 3)
             
             computeEncoder.setComputePipelineState(rtPipelineState!)
             
             computeEncoder.setTexture(accumulationTargets[accumulationTargetIdx], index: 0)
             computeEncoder.setTexture(self.brickPool, index: TextureIndex.BrickPoolIndex.rawValue)
+
+            computeEncoder.useResource(self.instAccStruct!, usage: .read)
             computeEncoder.useResource(self.accStruct!, usage: .read)
             
             computeEncoder.dispatchThreadgroups(threadgroups, threadsPerThreadgroup: threadsPerThreadgroup)

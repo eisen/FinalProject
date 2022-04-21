@@ -67,7 +67,7 @@ struct Box {
     float3 boxMax;
 };
 
-[[intersection(bounding_box, triangle_data)]]
+[[intersection(bounding_box, triangle_data, instancing)]]
 BoundingBoxResult brickIntersectionFunc(float3 origin                      [[origin]],
                                         float3 direction                   [[direction]],
                                         float minDistance                  [[min_distance]],
@@ -102,9 +102,10 @@ BoundingBoxResult brickIntersectionFunc(float3 origin                      [[ori
     return { true, dist };
 }
 
-kernel void interceptBricks(primitive_acceleration_structure accStruct [[buffer(0)]],
-                            intersection_function_table<triangle_data> functionTable [[buffer(1)]],
-                            constant Uniforms & uniforms [[buffer(2)]],
+kernel void interceptBricks(instance_acceleration_structure accStruct [[buffer(0)]],
+                            primitive_acceleration_structure primStruct [[buffer(1)]],
+                            intersection_function_table<triangle_data, instancing> functionTable [[buffer(2)]],
+                            constant Uniforms & uniforms [[buffer(3)]],
                             texture2d<float, access::write> dstTex [[texture(0)]],
                             texture3d<uint> brickPool [[texture(BrickPoolIndex)]],
                             uint2 tid [[thread_position_in_grid]])
@@ -126,13 +127,13 @@ kernel void interceptBricks(primitive_acceleration_structure accStruct [[buffer(
         r.direction = normalize(uv.x * camera.right + uv.y * camera.up + camera.forward);
         r.max_distance = INFINITY;
         
-        intersector<triangle_data> intersector;
+        intersector<triangle_data, instancing> intersector;
         
-        intersection_result<triangle_data> intersection;
+        intersection_result<triangle_data, instancing> intersection;
         
         float3 intersectionPoint;
         
-        intersection = intersector.intersect(r, accStruct, functionTable, intersectionPoint);
+        intersection = intersector.intersect(r, accStruct, 3, functionTable, intersectionPoint);
         
         if( intersection.type == intersection_type::none) {
             dstTex.write(float4(uv.x, uv.y, 1, 1), tid);
