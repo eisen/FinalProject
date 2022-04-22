@@ -11,6 +11,7 @@
 		9F28DEFD2800A85600362E61 /* Brick.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F28DEFC2800A85600362E61 /* Brick.swift */; };
 		9F28DEFF2800A86E00362E61 /* MacroCell.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F28DEFE2800A86E00362E61 /* MacroCell.swift */; };
 		9F34817C2809059E0014D3FE /* FPS.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F34817A2809059E0014D3FE /* FPS.swift */; };
+		9F4AF5A328121C6700F055F0 /* MathLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F4AF5A228121C6700F055F0 /* MathLibrary.swift */; };
 		9F6E73252810CA7300EF9469 /* IsoFeatures.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F6E73242810CA7300EF9469 /* IsoFeatures.swift */; };
 		9F6E732C2810CB8E00EF9469 /* PythonKit in Frameworks */ = {isa = PBXBuildFile; productRef = 9F6E732B2810CB8E00EF9469 /* PythonKit */; };
 		9F814A2C280519A800AA35FD /* RawView.xib in Resources */ = {isa = PBXBuildFile; fileRef = 9F814A2B280519A800AA35FD /* RawView.xib */; };
@@ -29,6 +30,7 @@
 		9F28DEFC2800A85600362E61 /* Brick.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Brick.swift; sourceTree = "<group>"; };
 		9F28DEFE2800A86E00362E61 /* MacroCell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacroCell.swift; sourceTree = "<group>"; };
 		9F34817A2809059E0014D3FE /* FPS.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FPS.swift; sourceTree = "<group>"; };
+		9F4AF5A228121C6700F055F0 /* MathLibrary.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = MathLibrary.swift; sourceTree = "<group>"; };
 		9F6E73242810CA7300EF9469 /* IsoFeatures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IsoFeatures.swift; sourceTree = "<group>"; };
 		9F814A2B280519A800AA35FD /* RawView.xib */ = {isa = PBXFileReference; lastKnownFileType = file.xib; path = RawView.xib; sourceTree = "<group>"; };
 		9F814A2D28051BD600AA35FD /* RawView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RawView.swift; sourceTree = "<group>"; };
@@ -76,6 +78,7 @@
 		9F93D2D827FA44D600654019 /* Final Project */ = {
 			isa = PBXGroup;
 			children = (
+				9F4AF5A228121C6700F055F0 /* MathLibrary.swift */,
 				9F93D2D927FA44D600654019 /* AppDelegate.swift */,
 				9F93D2DB27FA44D600654019 /* GameViewController.swift */,
 				9F93D2DD27FA44D600654019 /* Renderer.swift */,
@@ -191,6 +194,7 @@
 				9F814A2E28051BD600AA35FD /* RawView.swift in Sources */,
 				9F28DEFD2800A85600362E61 /* Brick.swift in Sources */,
 				9F28DEFF2800A86E00362E61 /* MacroCell.swift in Sources */,
+				9F4AF5A328121C6700F055F0 /* MathLibrary.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

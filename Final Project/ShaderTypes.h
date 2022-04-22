@@ -53,7 +53,12 @@ typedef struct
     matrix_float4x4 modelMatrix;
     unsigned int width;
     unsigned int height;
+    unsigned int depth;
     Camera camera;
+    
+    float maxValue;
+    float isoValue;
+    vector_float3 dFactor;
 } Uniforms;
 
 #endif /* ShaderTypes_h */

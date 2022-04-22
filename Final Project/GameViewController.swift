@@ -19,8 +19,9 @@ class GameViewController: NSViewController, NSOpenSavePanelDelegate {
     @IBOutlet var progressBar: NSProgressIndicator!
     @IBOutlet var progressStatus: NSTextField!
     @IBOutlet var fpsLabel: NSTextField!
-    
-    
+    @IBOutlet var isoLabel: NSTextField!
+    @IBOutlet var isoSlider: NSSlider!
+
     override func viewDidLoad() {
         super.viewDidLoad()
         
@@ -53,6 +54,12 @@ class GameViewController: NSViewController, NSOpenSavePanelDelegate {
     }
     
     @IBAction
+    func updateIsoValue(_ sender: NSSlider) {
+        self.isoLabel.intValue = sender.intValue
+        self.renderer.isoValue = Float(sender.intValue)
+    }
+    
+    @IBAction
     func selectFile(_ sender: NSObject) {
 
         let myFileDialog = NSOpenPanel()
@@ -62,7 +69,6 @@ class GameViewController: NSViewController, NSOpenSavePanelDelegate {
         myFileDialog.isAccessoryViewDisclosed = true
         myFileDialog.allowsMultipleSelection = false
         myFileDialog.allowedFileTypes = ["raw"]
-        
         
         if myFileDialog.runModal() == .OK {
             let url = myFileDialog.url!
@@ -77,9 +83,17 @@ class GameViewController: NSViewController, NSOpenSavePanelDelegate {
             switch self.rawView.GetScalarSize() {
             case .BITS_16:
                 //self.renderer.SetScalarSize(size: .BITS_16)
+                self.isoSlider.maxValue = 4095
+                self.isoSlider.intValue = 0
+                self.isoLabel.intValue = 0
+                self.renderer.isoValue = 0
                 self.loadVolumeSet16(datFile: url, width: width, height: height, depth: depth)
             case .BITS_8:
                 //self.renderer.SetScalarSize(size: .BITS_8)
+                self.isoSlider.maxValue = 255
+                self.isoSlider.intValue = 0
+                self.isoLabel.intValue = 0
+                self.renderer.isoValue = 0
                 self.loadVolumeSet8(datFile: url, width: width, height: height, depth: depth)
             }
         } else {
@@ -216,7 +230,7 @@ class GameViewController: NSViewController, NSOpenSavePanelDelegate {
         var data: Data?
         do{
             data = try Data.init(contentsOf: datFile)
-            self.renderer.setVolumeData8(data: data!, dim: vector_int3(width, height, depth))
+            self.renderer.setVolumeData8(data: data!, dim: int3(width, height, depth))
         } catch {
             print(error)
         }

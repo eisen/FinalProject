@@ -30,6 +30,7 @@ public enum ScalarSize: Int {
 class Renderer: NSObject, MTKViewDelegate {
 
     public let device: MTLDevice
+    public var isoValue: Float = 0
     let commandQueue: MTLCommandQueue
     var dynamicUniformBuffer: MTLBuffer
     var pipelineState: MTLRenderPipelineState
@@ -56,8 +57,6 @@ class Renderer: NSObject, MTKViewDelegate {
 
     var projectionMatrix: matrix_float4x4 = matrix_float4x4()
 
-    var rotation: Float = 0
-
     var mesh: MTKMesh
     
     var intersector: MPSRayIntersector?
@@ -80,6 +79,11 @@ class Renderer: NSObject, MTKViewDelegate {
     var instBuffer: MTLBuffer?
     
     var size: CGSize?
+    var rotation: float3 = [0, 0, 0]
+    var target: float3 = [0, 0, 0]
+    var distance: Float = 2.0
+    var position: float3 = [-1.25, 1.25, -1.25]
+    var dFactor: float3 = [1.0, 1.0, 1.0]
     
     //var macroCellPool: MTLTexture?
     
@@ -96,12 +100,22 @@ class Renderer: NSObject, MTKViewDelegate {
         brickPoolDesc.depth = Int(dim.z)
         brickPoolDesc.pixelFormat = .r8Uint
         
+        self.isoValue = 0
+        scalarSize = .BITS_8
+        
+        var maxDim = max(Int(dim.x), Int(dim.y), Int(dim.z))
+        maxDim = Int(pow(2.0, ceil(log(Double(maxDim))/log(2))))
+        
+        dFactor.x = Float(dim.x) / Float(maxDim)
+        dFactor.y = Float(dim.y) / Float(maxDim)
+        dFactor.z = Float(dim.z) / Float(maxDim)
+        
         self.brickPool = self.device.makeTexture(descriptor: brickPoolDesc)!
         self.brickPool?.label = "Brick Pool UInt8"
         
         let region = MTLRegionMake3D(0, 0, 0, Int(dim.x), Int(dim.y), Int(dim.z))
         data.withUnsafeBytes {(bytes: UnsafePointer<UInt8>)->Void in
-            self.brickPool!.replace(region: region, mipmapLevel: 0, slice: 0, withBytes: bytes, bytesPerRow: Int(dim.x), bytesPerImage: Int(dim.x) * Int(dim.y))
+            self.brickPool!.replace(region: region, mipmapLevel: 0, slice: 0, withBytes: bytes, bytesPerRow: Int(dim.x) * MemoryLayout<UInt8>.size, bytesPerImage: Int(dim.x) * Int(dim.y) * MemoryLayout<UInt8>.size)
         }
     }
     
@@ -114,12 +128,22 @@ class Renderer: NSObject, MTKViewDelegate {
         brickPoolDesc.depth = Int(dim.z)
         brickPoolDesc.pixelFormat = .r16Uint
         
+        scalarSize = .BITS_16
+        self.isoValue = 0
+        
+        var maxDim = max(Int(dim.x), Int(dim.y), Int(dim.z))
+        maxDim = Int(pow(2.0, ceil(log(Double(maxDim))/log(2))))
+        
+        dFactor.x = Float(dim.x) / Float(maxDim)
+        dFactor.y = Float(dim.y) / Float(maxDim)
+        dFactor.z = Float(dim.z) / Float(maxDim)
+        
         self.brickPool = self.device.makeTexture(descriptor: brickPoolDesc)!
         self.brickPool?.label = "Brick Pool UInt16"
         
         let region = MTLRegionMake3D(0, 0, 0, Int(dim.x), Int(dim.y), Int(dim.z))
         data.withUnsafeBytes {(bytes: UnsafePointer<UInt16>)->Void in
-            self.brickPool!.replace(region: region, mipmapLevel: 0, slice: 0, withBytes: bytes, bytesPerRow: Int(dim.x), bytesPerImage: Int(dim.x) * Int(dim.y))
+            self.brickPool!.replace(region: region, mipmapLevel: 0, slice: 0, withBytes: bytes, bytesPerRow: Int(dim.x) * MemoryLayout<UInt16>.size, bytesPerImage: Int(dim.x) * Int(dim.y) * MemoryLayout<UInt16>.size)
         }
     }
     
@@ -340,12 +364,20 @@ class Renderer: NSObject, MTKViewDelegate {
 
     private func updateGameState() {
         /// Update any game state before rendering
-
+        
+//        rotation.x += 0.01
+//        let rotateMatrix = float4x4(
+//          rotationYXZ: [-rotation.x, rotation.y, 0])
+//        let distanceVector = float4(0, 0, -distance, 0)
+//        let rotatedVector = rotateMatrix * distanceVector
+//        position = target + rotatedVector.xyz
+        //print(target + rotatedVector.xyz)
+        
         uniforms[0].projectionMatrix = projectionMatrix
 
-        let rotationAxis = SIMD3<Float>(1, 1, 0)
-        let modelMatrix = matrix4x4_rotation(radians: rotation, axis: rotationAxis)
-        let viewMatrix = matrix4x4_translation(0.0, 2.0, -2.0)
+        let rotationAxis = SIMD3<Float>(0, 1, 0)
+        let modelMatrix = matrix4x4_rotation(radians: 3.14157, axis: rotationAxis)
+        let viewMatrix = float4x4(eye: position, center: target, up: [0, 0, -1])
         
         uniforms[0].modelMatrix = modelMatrix
         uniforms[0].modelViewMatrix = simd_mul(viewMatrix, modelMatrix)
@@ -354,10 +386,21 @@ class Renderer: NSObject, MTKViewDelegate {
             uniforms[0].width = UInt32(self.size!.width)
             uniforms[0].height = UInt32(self.size!.height)
         }
-        uniforms[0].camera.position = vector_float3(0, 2, -2)
-        uniforms[0].camera.forward = vector_float3(0, -0.70710678118, 0.70710678118)
-        uniforms[0].camera.up = vector_float3(0, 0.70710678118, 0.70710678118)
-        uniforms[0].camera.right = vector_float3(1, 0, 0)
+        let mat = viewMatrix.transpose
+        uniforms[0].camera.position = position
+        uniforms[0].camera.forward = mat.columns.2.xyz
+        uniforms[0].camera.up = mat.columns.1.xyz
+        uniforms[0].camera.right = mat.columns.0.xyz
+        
+        switch(scalarSize) {
+        case .BITS_8:
+            uniforms[0].maxValue = 256.0
+        case .BITS_16:
+            uniforms[0].maxValue = 4096.0
+        }
+        
+        uniforms[0].dFactor = dFactor
+        uniforms[0].isoValue = isoValue
     }
     
 //    private func generateWorkingSet() {

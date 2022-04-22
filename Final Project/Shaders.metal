@@ -50,7 +50,6 @@ fragment float4 fragmentShader(ColorInOut in [[stage_in]],
                                    mag_filter::linear);
 
     float3 sampleCoord = float3(in.texCoord.x, in.texCoord.y, 0);
-    //float sample = brickPool.sample(colorSampler, sampleCoord).r / 256.0;
     half4 sample = colorMap.sample(colorSampler, sampleCoord.xy);
     float4 color = float4(sample);
     
@@ -67,41 +66,6 @@ struct Box {
     float3 boxMax;
 };
 
-[[intersection(bounding_box)]]
-IntersectionResult brickIntersectionFunc(float3 origin                      [[origin]],
-                                        float3 direction                   [[direction]],
-                                        float minDistance                  [[min_distance]],
-                                        float maxDistance                  [[max_distance]],
-                                        uint primitiveIndex                [[primitive_id]],
-                                        device Box* boundingBoxes          [[buffer(0)]],
-                                        ray_data float3& intersectionPoint [[payload]])
-{
-    float dist = 0.0;
-    
-    Box bbox = boundingBoxes[primitiveIndex];
-    float3 t1 = (bbox.boxMin - origin) / direction;
-    float3 t2 = (bbox.boxMax - origin) / direction;
-
-    float3 tmin = min(t1.x, t2.x);
-    float3 tmax = max(t1.x, t2.x);
-
-    bool intersected = min3(tmax.x, tmax.y, tmax.z) > max3(tmin.x, tmin.y, tmin.z);
-
-    float3 intPoint;
-    if(!intersected) {
-        return { false, 0.0f };
-    } else {
-        intPoint = tmin * direction + origin;
-        dist = distance(intPoint, origin);
-        if (dist < minDistance || dist > maxDistance) {
-            return { false, 0.0f };
-        }
-        intersectionPoint = intPoint;
-    }
-    
-    return { true, dist };
-}
-
 kernel void interceptBricks(acceleration_structure<> primStruct [[buffer(0)]],
                             constant Uniforms & uniforms [[buffer(1)]],
                             texture2d<float, access::write> dstTex [[texture(0)]],
@@ -110,8 +74,7 @@ kernel void interceptBricks(acceleration_structure<> primStruct [[buffer(0)]],
 {
     
     if (tid.x < uniforms.width && tid.y < uniforms.height) {
-        constexpr sampler colorSampler(mip_filter::linear,
-                                       mag_filter::linear);
+        constexpr sampler colorSampler(filter::linear, address::clamp_to_zero);
 
         ray r;
         
@@ -123,44 +86,37 @@ kernel void interceptBricks(acceleration_structure<> primStruct [[buffer(0)]],
         
         r.origin = camera.position;
         r.direction = normalize((uv.x - 0.5) * camera.right + (uv.y - 0.5) * camera.up + camera.forward);
-        r.max_distance = INFINITY;
+        r.max_distance = 4;
         
         intersector<triangle_data> intersector;
         intersection_result<triangle_data> intersection;
         
-//        intersector<triangle_data, instancing> intersector;
-//        intersection_result<triangle_data, instancing> intersection;
-        
-        //float3 intersectionPoint;
-        
         intersection = intersector.intersect(r, primStruct);
-        //intersection = intersector.intersect(r, instStruct, 3, functionTable, intersectionPoint);
         
-        if( intersection.type == intersection_type::none) {
+        if( intersection.type == intersection_type::none || intersection.triangle_front_facing == false) {
             dstTex.write(float4(0, 0, 0, 1), tid);
             return;
         }
-        
-        //unsigned int geometryIndex = intersection.geometry_id;
-        //float2 geometryIndex = intersection.triangle_barycentric_coord;
-
-        // Convert geometry index to brick pool coordinate
-        //float3 xyzStart = r.origin + r.direction * intersection.distance;
-        //float3 xyzEnd = float3( ((geometryIndex + 1) % (8 * 9)) / 8.0, (((geometryIndex + 1) / 8) % 9) / 8.0, ((geometryIndex + 1)/ 64) / 9.0);
 
         float3 xyz = r.origin + r.direction * intersection.distance;
         xyz.x += 0.5;
+        xyz.x *= uniforms.dFactor.x;
+        
         xyz.y += 0.5;
+        xyz.y *= uniforms.dFactor.y;
+        
+        xyz.z += 0.5;
+        xyz.z *= uniforms.dFactor.z;
 
         float sample = brickPool.sample(colorSampler, xyz).r;
         float4 sampleColor = float4(0, 0, 0, 1);
 
-        while(xyz.z < 1.0) {
-            
-            xyz += r.direction * 0.00390625;
+        while(xyz.z <= 1.0 && xyz.x <= 1.0 && xyz.y <= 1.0) {
+
+            xyz += r.direction * 0.005;
             sample = brickPool.sample(colorSampler, xyz).r;
-            if(sample > 167) {
-                float val = sample / 256.0;
+            if(sample >= uniforms.isoValue) {
+                float val = sample / uniforms.maxValue;
                 sampleColor = float4(val, val, val, 1);
                 break;
             }
@@ -168,6 +124,21 @@ kernel void interceptBricks(acceleration_structure<> primStruct [[buffer(0)]],
         
         dstTex.write(sampleColor, tid);
     }
+}
+
+kernel void calculateGradient(texture3d<uint, access::write> brickPool [[texture(BrickPoolIndex)]],
+                              uint3 tid [[thread_position_in_grid]])
+{
+    constexpr sampler scalarSampler(filter::linear, address::clamp_to_zero, coord::pixel);
+    
+    float3 voxel = (float3)tid;
+    
+    uint sample = brickPool.sample(scalarSampler, voxel).a;
+    
+    voxel.x += 1;
+    sample = brickPool.sample(scalarSampler, voxel).a;
+    
+    brickPool.write(uint4(0), tid);
 }
 
 // Screen filling quad in normalized device coordinates.
