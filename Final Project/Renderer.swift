@@ -31,6 +31,7 @@ class Renderer: NSObject, MTKViewDelegate {
 
     public let device: MTLDevice
     public var isoValue: Float = 0
+    let metalKitView: MTKView
     let commandQueue: MTLCommandQueue
     var dynamicUniformBuffer: MTLBuffer
     var pipelineState: MTLRenderPipelineState
@@ -92,58 +93,88 @@ class Renderer: NSObject, MTKViewDelegate {
     }
     
     public func setVolumeData8(data: Data, dim: vector_int3) {
-        let brickPoolDesc = MTLTextureDescriptor.init()
-        
-        brickPoolDesc.textureType = .type3D
-        brickPoolDesc.width = Int(dim.x)
-        brickPoolDesc.height = Int(dim.y)
-        brickPoolDesc.depth = Int(dim.z)
-        brickPoolDesc.pixelFormat = .r8Uint
-        
-        self.isoValue = 0
-        scalarSize = .BITS_8
-        
-        var maxDim = max(Int(dim.x), Int(dim.y), Int(dim.z))
-        maxDim = Int(pow(2.0, ceil(log(Double(maxDim))/log(2))))
-        
-        dFactor.x = Float(dim.x) / Float(maxDim)
-        dFactor.y = Float(dim.y) / Float(maxDim)
-        dFactor.z = Float(dim.z) / Float(maxDim)
-        
-        self.brickPool = self.device.makeTexture(descriptor: brickPoolDesc)!
-        self.brickPool?.label = "Brick Pool UInt8"
-        
-        let region = MTLRegionMake3D(0, 0, 0, Int(dim.x), Int(dim.y), Int(dim.z))
-        data.withUnsafeBytes {(bytes: UnsafePointer<UInt8>)->Void in
-            self.brickPool!.replace(region: region, mipmapLevel: 0, slice: 0, withBytes: bytes, bytesPerRow: Int(dim.x) * MemoryLayout<UInt8>.size, bytesPerImage: Int(dim.x) * Int(dim.y) * MemoryLayout<UInt8>.size)
+        DispatchQueue.global(qos: .userInitiated).async { [self] in
+            var voxels: [UInt32] = []
+            let brickPoolDesc = MTLTextureDescriptor.init()
+            
+            for byte in data {
+                voxels.append(UInt32(byte) << 24) // Little endian
+            }
+            
+            brickPoolDesc.textureType = .type3D
+            brickPoolDesc.width = Int(dim.x)
+            brickPoolDesc.height = Int(dim.y)
+            brickPoolDesc.depth = Int(dim.z)
+            brickPoolDesc.pixelFormat = .rgba8Uint
+            brickPoolDesc.usage = [.shaderRead, .shaderWrite]
+            
+            self.isoValue = 0
+            scalarSize = .BITS_8
+            
+            var maxDim = max(Int(dim.x), Int(dim.y), Int(dim.z))
+            maxDim = Int(pow(2.0, ceil(log(Double(maxDim))/log(2))))
+            
+            dFactor.x = Float(dim.x) / Float(maxDim)
+            dFactor.y = Float(dim.y) / Float(maxDim)
+            dFactor.z = Float(dim.z) / Float(maxDim)
+            
+            self.brickPool = self.device.makeTexture(descriptor: brickPoolDesc)!
+            self.brickPool?.label = "Brick Pool UInt8"
+            
+            let region = MTLRegionMake3D(0, 0, 0, Int(dim.x), Int(dim.y), Int(dim.z))
+            self.brickPool!.replace(region: region, mipmapLevel: 0, slice: 0, withBytes: voxels, bytesPerRow: Int(dim.x) * MemoryLayout<UInt32>.size, bytesPerImage: Int(dim.x) * Int(dim.y) * MemoryLayout<UInt32>.size)
+            self.calculateGradient(dim: dim)
+            
+            DispatchQueue.main.async {
+                let vc = self.metalKitView.nextResponder as! GameViewController
+                vc.HideProgress()
+            }
         }
     }
     
     public func setVolumeData16(data: Data, dim: vector_int3) {
-        let brickPoolDesc = MTLTextureDescriptor.init()
-        
-        brickPoolDesc.textureType = .type3D
-        brickPoolDesc.width = Int(dim.x)
-        brickPoolDesc.height = Int(dim.y)
-        brickPoolDesc.depth = Int(dim.z)
-        brickPoolDesc.pixelFormat = .r16Uint
-        
-        scalarSize = .BITS_16
-        self.isoValue = 0
-        
-        var maxDim = max(Int(dim.x), Int(dim.y), Int(dim.z))
-        maxDim = Int(pow(2.0, ceil(log(Double(maxDim))/log(2))))
-        
-        dFactor.x = Float(dim.x) / Float(maxDim)
-        dFactor.y = Float(dim.y) / Float(maxDim)
-        dFactor.z = Float(dim.z) / Float(maxDim)
-        
-        self.brickPool = self.device.makeTexture(descriptor: brickPoolDesc)!
-        self.brickPool?.label = "Brick Pool UInt16"
-        
-        let region = MTLRegionMake3D(0, 0, 0, Int(dim.x), Int(dim.y), Int(dim.z))
-        data.withUnsafeBytes {(bytes: UnsafePointer<UInt16>)->Void in
-            self.brickPool!.replace(region: region, mipmapLevel: 0, slice: 0, withBytes: bytes, bytesPerRow: Int(dim.x) * MemoryLayout<UInt16>.size, bytesPerImage: Int(dim.x) * Int(dim.y) * MemoryLayout<UInt16>.size)
+        DispatchQueue.global(qos: .userInitiated).async { [self] in
+            var voxels: [UInt64] = []
+            let brickPoolDesc = MTLTextureDescriptor.init()
+            
+            var byte: UInt64 = 0
+            for (idx, elem) in data.enumerated() {
+                let pos = idx % 2
+                if pos == 0 {
+                    byte = UInt64(elem) << 52 // Little endian
+                } else {
+                    voxels.append( byte | UInt64(elem) << 40)
+                }
+            }
+            
+            brickPoolDesc.textureType = .type3D
+            brickPoolDesc.width = Int(dim.x)
+            brickPoolDesc.height = Int(dim.y)
+            brickPoolDesc.depth = Int(dim.z)
+            brickPoolDesc.pixelFormat = .rgba16Uint
+            brickPoolDesc.usage = [.shaderRead, .shaderWrite]
+            
+            scalarSize = .BITS_16
+            self.isoValue = 0
+            
+            var maxDim = max(Int(dim.x), Int(dim.y), Int(dim.z))
+            maxDim = Int(pow(2.0, ceil(log(Double(maxDim))/log(2))))
+            
+            dFactor.x = Float(dim.x) / Float(maxDim)
+            dFactor.y = Float(dim.y) / Float(maxDim)
+            dFactor.z = Float(dim.z) / Float(maxDim)
+            
+            self.brickPool = self.device.makeTexture(descriptor: brickPoolDesc)!
+            self.brickPool?.label = "Brick Pool UInt16"
+            
+            let region = MTLRegionMake3D(0, 0, 0, Int(dim.x), Int(dim.y), Int(dim.z))
+            self.brickPool!.replace(region: region, mipmapLevel: 0, slice: 0, withBytes: voxels, bytesPerRow: Int(dim.x) * MemoryLayout<UInt64>.size, bytesPerImage: Int(dim.x) * Int(dim.y) * MemoryLayout<UInt64>.size)
+            self.calculateGradient(dim: dim)
+            
+            DispatchQueue.main.async {
+                let vc = self.metalKitView.nextResponder as! GameViewController
+                vc.HideProgress()
+            }
         }
     }
     
@@ -194,6 +225,7 @@ class Renderer: NSObject, MTKViewDelegate {
 
     init?(metalKitView: MTKView) {
         self.device = metalKitView.device!
+        self.metalKitView = metalKitView
         self.commandQueue = self.device.makeCommandQueue()!
 
         let uniformBufferSize = alignedUniformsSize * maxBuffersInFlight
@@ -308,7 +340,49 @@ class Renderer: NSObject, MTKViewDelegate {
         
         return computePipelineState
     }
+    
+    func buildGradientPipelineWithDevice(device: MTLDevice,
+                                             metalKitView: MTKView) throws -> MTLComputePipelineState {
+        let library = device.makeDefaultLibrary()!
 
+        let computePipelineDesc = MTLComputePipelineDescriptor()
+        computePipelineDesc.computeFunction = library.makeFunction(name: "calculateGradient")!
+        
+        let computePipelineState = try device.makeComputePipelineState(descriptor: computePipelineDesc, options: .bufferTypeInfo, reflection: nil)
+        
+        return computePipelineState
+    }
+
+    func calculateGradient(dim: vector_int3) {
+        let threadsPerThreadgroup = MTLSizeMake(8, 8, 8)
+        let width = Int(dim.x)
+        let height = Int(dim.y)
+        let depth = Int(dim.z)
+        let threadgroups = MTLSizeMake((width  + threadsPerThreadgroup.width  - 1) / threadsPerThreadgroup.width,
+                                           (height + threadsPerThreadgroup.height - 1) / threadsPerThreadgroup.height,
+                                       (depth + threadsPerThreadgroup.depth - 1) / threadsPerThreadgroup.depth);
+        
+        let commandBuffer = commandQueue.makeCommandBuffer()
+        let computeEncoder = commandBuffer!.makeComputeCommandEncoder()!
+        
+        do {
+            try computeEncoder.setComputePipelineState(self.buildGradientPipelineWithDevice(device: self.device, metalKitView: self.metalKitView))
+            
+            computeEncoder.setBuffer(dynamicUniformBuffer, offset: 0, index: 1)
+            
+            computeEncoder.setTexture(self.brickPool, index: TextureIndex.BrickPoolIndex.rawValue)
+            
+            computeEncoder.dispatchThreadgroups(threadgroups, threadsPerThreadgroup: threadsPerThreadgroup)
+            
+            computeEncoder.endEncoding()
+            
+            commandBuffer?.commit()
+            commandBuffer?.waitUntilCompleted()
+        } catch {
+            print("Error creating gradient pipeline")
+        }
+    }
+    
     class func buildMesh(device: MTLDevice,
                          mtlVertexDescriptor: MTLVertexDescriptor) throws -> MTKMesh {
         /// Create and condition mesh data to feed into a pipeline using the given vertex descriptor

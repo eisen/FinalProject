@@ -76,7 +76,7 @@ class GameViewController: NSViewController, NSOpenSavePanelDelegate {
             let height = Int32(self.rawView.GetHeight())
             let depth = Int32(self.rawView.GetDepth())
             
-            //self.ShowProgress()
+            self.ShowProgress()
             
             //IsoFeatures.GetIsoValues(url: url.path, dim: vector_int3(x: Int32(width), y: Int32(height), z: Int32(depth)), scalarSize: self.rawView.GetScalarSize())
             
@@ -97,16 +97,18 @@ class GameViewController: NSViewController, NSOpenSavePanelDelegate {
                 self.loadVolumeSet8(datFile: url, width: width, height: height, depth: depth)
             }
         } else {
-            //self.HideProgress()
+            self.HideProgress()
         }
     }
     
-    private func ShowProgress() {
+    public func ShowProgress() {
         progressBar.isHidden = false
         progressStatus.isHidden = false
+        progressBar.startAnimation(nil)
     }
     
-    private func HideProgress() {
+    public func HideProgress() {
+        progressBar.stopAnimation(nil)
         progressBar.isHidden = true
         progressStatus.isHidden = true
     }
@@ -117,18 +119,21 @@ class GameViewController: NSViewController, NSOpenSavePanelDelegate {
     }
     
     func loadVolumeSet16(datFile: URL, width: Int32, height: Int32, depth: Int32) {
+        progressStatus.stringValue = "Loading \(datFile.lastPathComponent)..."
+        
         var data: Data?
         do {
             data = try Data.init(contentsOf: datFile)
-            self.renderer.setVolumeData16(data: data!, dim: vector_int3(width, height, depth))
         } catch {
             print(error)
         }
         
-//        if ( width * height * depth * 2 != data?.count) {
-//            ShowAlert()
-//            return
-//        }
+        if ( width * height * depth * 2 != data!.count) {
+            ShowAlert()
+            return
+        }
+        
+        self.renderer.setVolumeData16(data: data!, dim: vector_int3(width, height, depth))
 //        
 //        let brickDim = 128
 //        
@@ -225,20 +230,21 @@ class GameViewController: NSViewController, NSOpenSavePanelDelegate {
     
     func loadVolumeSet8(datFile: URL, width: Int32, height: Int32, depth: Int32) {
         
-        //progressStatus.stringValue = "Converting \(datFile.path)..."
+        progressStatus.stringValue = "Loading \(datFile.lastPathComponent)..."
         
         var data: Data?
         do{
             data = try Data.init(contentsOf: datFile)
-            self.renderer.setVolumeData8(data: data!, dim: int3(width, height, depth))
         } catch {
             print(error)
         }
         
-//        if ( width * height * depth != data?.count) {
-//            ShowAlert()
-//            return
-//        }
+        if ( width * height * depth != data!.count) {
+            ShowAlert()
+            return
+        }
+        
+        self.renderer.setVolumeData8(data: data!, dim: vector_int3(width, height, depth))
 //
 //        let brickDim = 128
 //

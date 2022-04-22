@@ -108,13 +108,13 @@ kernel void interceptBricks(acceleration_structure<> primStruct [[buffer(0)]],
         xyz.z += 0.5;
         xyz.z *= uniforms.dFactor.z;
 
-        float sample = brickPool.sample(colorSampler, xyz).r;
+        float sample = brickPool.sample(colorSampler, xyz).a;
         float4 sampleColor = float4(0, 0, 0, 1);
 
         while(xyz.z <= 1.0 && xyz.x <= 1.0 && xyz.y <= 1.0) {
 
             xyz += r.direction * 0.005;
-            sample = brickPool.sample(colorSampler, xyz).r;
+            sample = brickPool.sample(colorSampler, xyz).a;
             if(sample >= uniforms.isoValue) {
                 float val = sample / uniforms.maxValue;
                 sampleColor = float4(val, val, val, 1);
@@ -126,19 +126,18 @@ kernel void interceptBricks(acceleration_structure<> primStruct [[buffer(0)]],
     }
 }
 
-kernel void calculateGradient(texture3d<uint, access::write> brickPool [[texture(BrickPoolIndex)]],
+kernel void calculateGradient(constant Uniforms & uniforms [[buffer(1)]],
+                              texture3d<uint, access::read_write> brickPool [[texture(BrickPoolIndex)]],
                               uint3 tid [[thread_position_in_grid]])
-{
-    constexpr sampler scalarSampler(filter::linear, address::clamp_to_zero, coord::pixel);
-    
-    float3 voxel = (float3)tid;
-    
-    uint sample = brickPool.sample(scalarSampler, voxel).a;
-    
-    voxel.x += 1;
-    sample = brickPool.sample(scalarSampler, voxel).a;
-    
-    brickPool.write(uint4(0), tid);
+{    
+    uint3 voxel = tid;
+
+    uint sample = brickPool.read(voxel).a;
+
+//    voxel.x += 1;
+//    sample = brickPool.read(tid).a;
+
+    brickPool.write(uint4(0, 0, 0, sample), tid);
 }
 
 // Screen filling quad in normalized device coordinates.
