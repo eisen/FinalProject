@@ -21,6 +21,8 @@ class GameViewController: NSViewController, NSOpenSavePanelDelegate {
     @IBOutlet var fpsLabel: NSTextField!
     @IBOutlet var isoLabel: NSTextField!
     @IBOutlet var isoSlider: NSSlider!
+    @IBOutlet var pitchSlider: NSSlider!
+    @IBOutlet var yawSlider: NSSlider!
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -57,6 +59,18 @@ class GameViewController: NSViewController, NSOpenSavePanelDelegate {
     func updateIsoValue(_ sender: NSSlider) {
         self.isoLabel.intValue = sender.intValue
         self.renderer.isoValue = Float(sender.intValue)
+    }
+    
+    @IBAction
+    func updatePitchValue(_ sender: NSSlider) {
+        let value = (sender.floatValue / 50.0) * Float.pi
+        self.renderer.rotation[0] = value
+    }
+    
+    @IBAction
+    func updateYawValue(_ sender: NSSlider) {
+        let value = (sender.floatValue / 50.0) * Float.pi
+        self.renderer.rotation[1] = value
     }
     
     @IBAction

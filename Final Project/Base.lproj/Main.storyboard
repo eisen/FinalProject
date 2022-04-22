@@ -734,7 +734,7 @@
                             <slider verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="VTH-IB-tXD">
                                 <rect key="frame" x="108" y="14" width="583" height="28"/>
                                 <autoresizingMask key="autoresizingMask" widthSizable="YES" flexibleMaxX="YES" flexibleMaxY="YES"/>
-                                <sliderCell key="cell" continuous="YES" state="on" alignment="left" tickMarkPosition="above" numberOfTickMarks="5" sliderType="linear" id="gbw-52-Tod"/>
+                                <sliderCell key="cell" continuous="YES" state="on" alignment="left" maxValue="4096" tickMarkPosition="above" numberOfTickMarks="5" sliderType="linear" id="gbw-52-Tod"/>
                                 <connections>
                                     <action selector="updateIsoValue:" target="XfG-lQ-9wD" id="xcP-1t-EUw"/>
                                 </connections>
@@ -748,15 +748,33 @@
                                     <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
                                 </textFieldCell>
                             </textField>
+                            <slider verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="DvB-sf-61t">
+                                <rect key="frame" x="18" y="44" width="763" height="28"/>
+                                <autoresizingMask key="autoresizingMask" widthSizable="YES" flexibleMaxY="YES"/>
+                                <sliderCell key="cell" continuous="YES" state="on" alignment="left" minValue="-25" maxValue="25" tickMarkPosition="above" numberOfTickMarks="5" sliderType="linear" id="mGW-pE-23k"/>
+                                <connections>
+                                    <action selector="updateYawValue:" target="XfG-lQ-9wD" id="D8o-uG-iDI"/>
+                                </connections>
+                            </slider>
+                            <slider horizontalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="JAh-OA-EKM">
+                                <rect key="frame" x="18" y="72" width="24" height="459"/>
+                                <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" heightSizable="YES"/>
+                                <sliderCell key="cell" continuous="YES" alignment="left" minValue="-25" maxValue="25" tickMarkPosition="right" numberOfTickMarks="5" sliderType="linear" id="2bx-1u-8DA"/>
+                                <connections>
+                                    <action selector="updatePitchValue:" target="XfG-lQ-9wD" id="5B3-MF-myv"/>
+                                </connections>
+                            </slider>
                         </subviews>
                     </view>
                     <connections>
                         <outlet property="fpsLabel" destination="240-IL-ISU" id="dlf-ZT-DhF"/>
                         <outlet property="isoLabel" destination="Iy6-eX-CxI" id="Sbg-jd-jhs"/>
                         <outlet property="isoSlider" destination="VTH-IB-tXD" id="Yp4-Oe-ec8"/>
+                        <outlet property="pitchSlider" destination="JAh-OA-EKM" id="o8w-fl-3FZ"/>
                         <outlet property="progressBar" destination="8Hx-vz-33U" id="Ar6-j7-iBV"/>
                         <outlet property="progressStatis" destination="Tr1-qp-yUp" id="iBX-RS-BDr"/>
                         <outlet property="progressStatus" destination="Tr1-qp-yUp" id="jHn-oR-OJe"/>
+                        <outlet property="yawSlider" destination="DvB-sf-61t" id="s6L-AQ-SJ8"/>
                     </connections>
                 </viewController>
                 <customObject id="rPt-NT-nkU" userLabel="First Responder" customClass="NSResponder" sceneMemberID="firstResponder"/>

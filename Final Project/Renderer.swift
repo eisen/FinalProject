@@ -80,10 +80,10 @@ class Renderer: NSObject, MTKViewDelegate {
     var instBuffer: MTLBuffer?
     
     var size: CGSize?
-    var rotation: float3 = [0, 0, 0]
+    public var rotation: float3 = [0, 0, 0]
     var target: float3 = [0, 0, 0]
-    var distance: Float = 2.0
-    var position: float3 = [-1.25, 1.25, -1.25]
+    var distance: Float = 2.5
+    var position: float3 = [0, 0, -2.5]
     var dFactor: float3 = [1.0, 1.0, 1.0]
     
     //var macroCellPool: MTLTexture?
@@ -439,19 +439,18 @@ class Renderer: NSObject, MTKViewDelegate {
     private func updateGameState() {
         /// Update any game state before rendering
         
-//        rotation.x += 0.01
-//        let rotateMatrix = float4x4(
-//          rotationYXZ: [-rotation.x, rotation.y, 0])
-//        let distanceVector = float4(0, 0, -distance, 0)
-//        let rotatedVector = rotateMatrix * distanceVector
-//        position = target + rotatedVector.xyz
+        let rotateMatrix = float4x4(
+          rotationYXZ: [-rotation.x, rotation.y, 0])
+        let distanceVector = float4(0, 0, -distance, 0)
+        let rotatedVector = rotateMatrix * distanceVector
+        position = target + rotatedVector.xyz
         //print(target + rotatedVector.xyz)
         
         uniforms[0].projectionMatrix = projectionMatrix
 
         let rotationAxis = SIMD3<Float>(0, 1, 0)
-        let modelMatrix = matrix4x4_rotation(radians: 3.14157, axis: rotationAxis)
-        let viewMatrix = float4x4(eye: position, center: target, up: [0, 0, -1])
+        let modelMatrix = matrix4x4_rotation(radians: 0, axis: rotationAxis)
+        let viewMatrix = float4x4(eye: position, center: target, up: [0, 1, 0])
         
         uniforms[0].modelMatrix = modelMatrix
         uniforms[0].modelViewMatrix = simd_mul(viewMatrix, modelMatrix)

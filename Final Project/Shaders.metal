@@ -100,13 +100,13 @@ kernel void interceptBricks(acceleration_structure<> primStruct [[buffer(0)]],
 
         float3 xyz = r.origin + r.direction * intersection.distance;
         xyz.x += 0.5;
-        xyz.x *= uniforms.dFactor.x;
+        xyz.x /= uniforms.dFactor.x;
         
         xyz.y += 0.5;
-        xyz.y *= uniforms.dFactor.y;
+        xyz.y /= uniforms.dFactor.y;
         
         xyz.z += 0.5;
-        xyz.z *= uniforms.dFactor.z;
+        xyz.z /= uniforms.dFactor.z;
 
         float sample = brickPool.sample(colorSampler, xyz).a;
         float4 sampleColor = float4(0, 0, 0, 1);
