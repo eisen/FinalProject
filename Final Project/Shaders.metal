@@ -110,16 +110,12 @@ kernel void interceptBricks(acceleration_structure<> primStruct [[buffer(0)]],
 
         float sample = brickPool.sample(colorSampler, xyz).a;
         float3 sampleColor = float3 (0);
-//        float4 sampleColor = float4(0, 0, 0, 1);
 
         while(xyz.z <= 1.0 && xyz.x <= 1.0 && xyz.y <= 1.0) {
-
             xyz += r.direction * 0.005;
             sample = brickPool.sample(colorSampler, xyz).a;
             if(sample >= uniforms.isoValue) {
-//                float val = sample / uniforms.maxValue;
-//                sampleColor = float4(val, val, val, 1);
-                sampleColor = float3 ((brickPool.sample(colorSampler, xyz).xyz /100) + 1) ;
+                sampleColor = float3 ((brickPool.sample(colorSampler, xyz).xyz /100) - 1) ;
                 break;
             }
         }
@@ -138,9 +134,6 @@ kernel void calculateGradient(constant Uniforms & uniforms [[buffer(1)]],
     uint sample = brickPool.read(voxel).a;
     sample = brickPool.read(tid).a;
     
-//    if (sample == 0){
-//        return;
-//    }
     if(tid.x == 0){
         brickPool.write(uint4(0, 100, 100, sample), tid);
         return;
@@ -161,13 +154,12 @@ kernel void calculateGradient(constant Uniforms & uniforms [[buffer(1)]],
         return;
     }
     
-    //total 9 + 9 + 8
     uint surroundingValue = 0;
     uint k = 0;
     uint delta = 0;
     uint originalValue = 0;
     uint maxGradientValue = 0; //should this be negative in any case?
-    uint3 maxGradient = {0};
+    uint3 maxGradientList[9] = {0};
     
     for(uint x = refVoxel.x-1 ; x<=refVoxel.x+1 ; x++){
         for(uint y = refVoxel.y-1 ; y<=refVoxel.y+1 ; y++){
@@ -178,21 +170,33 @@ kernel void calculateGradient(constant Uniforms & uniforms [[buffer(1)]],
                 surroundingValue = brickPool.read(voxel).a;
                 originalValue = brickPool.read(refVoxel).a;
                 delta = abs(surroundingValue-originalValue);
-                if (maxGradientValue <= delta && delta != 0){ //not considered multiple max values
-//                    maxGradient[k] = voxel; //store that voxel x,y,z
-//                    k++;
-                    maxGradientValue = surroundingValue;
-                    maxGradient = voxel;
+                if (delta != 0){
+                    if (delta > maxGradientValue){ //not considered multiple max values
+                        maxGradientValue = delta;
+                        k = 0;
+                        maxGradientList[k] = voxel;
+                        k++;
+                    }else if (delta == maxGradientValue){
+                        maxGradientList[k] = voxel;
+                        k++;
+                    }
+                }else{
+                    continue;
                 }
             }
         }
     }
+    
+    float3 maxGradient = {0};
+    for(uint i=0 ; i<k ; i++){
+        maxGradient += float3(maxGradientList[i]-refVoxel);
+    }
+    maxGradient = maxGradient / k;
+    
     if(maxGradientValue != 0){
-        uint3 ret = uint3(normalize(float3(maxGradient - refVoxel)+1) * 100);
+        uint3 ret = uint3((normalize(maxGradient)+1) * 100);
         brickPool.write(uint4(ret.x, ret.y, ret.z, sample), tid);
     }
-    
-//    brickPool.write(uint4(0, 0, 0, sample), tid);
 }
 
 // Screen filling quad in normalized device coordinates.
