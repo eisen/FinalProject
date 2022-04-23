@@ -119,6 +119,7 @@ kernel void interceptBricks(acceleration_structure<> primStruct [[buffer(0)]],
         float4 pos = {0};
         float4 lpos = {0};
         
+        float3 ambient = {0.1, 0.1, 0.1};
         float3 diffuse = {0.5, 0.5, 0.5};
         float3 specular = {1, 1, 1};
         float shininess = 128;
@@ -135,10 +136,10 @@ kernel void interceptBricks(acceleration_structure<> primStruct [[buffer(0)]],
                 view = normalize( -pos.xyz );
                 normal = float3(( brickPool.sample( colorSampler, xyz ).xyz / 100 ) - 1);
                 n = normalize( uniforms.normalMatrix * float4( normal, 0 ) ).xyz;
-                l = normalize( lpos.xyz - pos.xyz );
+                l = normalize( pos.xyz - lpos.xyz );
                 h = normalize( view + l );
                 
-                sampleColor = diffuse * max( 0.0, dot( n, l ) ) + specular * pow( max( 0.0, dot( n, h ) ), shininess );
+                sampleColor = ambient + diffuse * max( 0.0, dot( n, l ) ) + specular * pow( max( 0.0, dot( n, h ) ), shininess );
                 break;
             }
         }

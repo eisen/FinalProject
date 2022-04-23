@@ -451,7 +451,7 @@ class Renderer: NSObject, MTKViewDelegate {
         //print(target + rotatedVector.xyz)
         
         uniforms[0].projectionMatrix = projectionMatrix
-        uniforms[0].lightPos = [0, 0, 2]
+        uniforms[0].lightPos = [0, 0, -2]
 
         let rotationAxis = SIMD3<Float>(0, 1, 0)
         let modelMatrix = matrix4x4_rotation(radians: 0, axis: rotationAxis)
