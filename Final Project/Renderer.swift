@@ -141,9 +141,9 @@ class Renderer: NSObject, MTKViewDelegate {
             for (idx, elem) in data.enumerated() {
                 let pos = idx % 2
                 if pos == 0 {
-                    byte = UInt64(elem) << 52 // Little endian
+                    byte = UInt64(elem) << 48 // Little endian
                 } else {
-                    voxels.append( byte | UInt64(elem) << 40)
+                    voxels.append( byte | UInt64(elem) << 56)
                 }
             }
             
