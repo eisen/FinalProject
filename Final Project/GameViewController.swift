@@ -83,6 +83,14 @@ class GameViewController: NSViewController, NSOpenSavePanelDelegate {
         self.rawView.width.intValue = Int32(defaults.integer(forKey: "Width"))
         self.rawView.height.intValue = Int32(defaults.integer(forKey: "Height"))
         self.rawView.depth.intValue = Int32(defaults.integer(forKey: "Depth"))
+        switch ScalarSize(rawValue: defaults.integer(forKey: "Scalar Size")) {
+        case .BITS_8:
+            self.rawView.byte.state = .on
+        case .BITS_16:
+            self.rawView.word.state = .on
+        case .none:
+            self.rawView.byte.state = .on
+        }
         
         myFileDialog.accessoryView = self.rawView
         myFileDialog.delegate = self
@@ -95,16 +103,18 @@ class GameViewController: NSViewController, NSOpenSavePanelDelegate {
             let width = Int32(self.rawView.GetWidth())
             let height = Int32(self.rawView.GetHeight())
             let depth = Int32(self.rawView.GetDepth())
+            let scalarSize = self.rawView.GetScalarSize()
             
             defaults.set(width, forKey: "Width")
             defaults.set(height, forKey: "Height")
             defaults.set(depth, forKey: "Depth")
+            defaults.set(scalarSize.rawValue, forKey: "Scalar Size")
             
             self.ShowProgress()
             
             //IsoFeatures.GetIsoValues(url: url.path, dim: vector_int3(x: Int32(width), y: Int32(height), z: Int32(depth)), scalarSize: self.rawView.GetScalarSize())
             
-            switch self.rawView.GetScalarSize() {
+            switch scalarSize {
             case .BITS_16:
                 //self.renderer.SetScalarSize(size: .BITS_16)
                 self.isoSlider.maxValue = 4095
