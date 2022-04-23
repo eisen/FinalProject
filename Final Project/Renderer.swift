@@ -358,6 +358,10 @@ class Renderer: NSObject, MTKViewDelegate {
         let width = Int(dim.x)
         let height = Int(dim.y)
         let depth = Int(dim.z)
+        uniforms[0].width = UInt32(width)
+        uniforms[0].height = UInt32(height)
+        uniforms[0].depth = UInt32(depth)
+        self.updateDynamicBufferState()
         let threadgroups = MTLSizeMake((width  + threadsPerThreadgroup.width  - 1) / threadsPerThreadgroup.width,
                                            (height + threadsPerThreadgroup.height - 1) / threadsPerThreadgroup.height,
                                        (depth + threadsPerThreadgroup.depth - 1) / threadsPerThreadgroup.depth);

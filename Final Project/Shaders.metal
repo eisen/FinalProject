@@ -109,20 +109,22 @@ kernel void interceptBricks(acceleration_structure<> primStruct [[buffer(0)]],
         xyz.z /= uniforms.dFactor.z;
 
         float sample = brickPool.sample(colorSampler, xyz).a;
-        float4 sampleColor = float4(0, 0, 0, 1);
+        float3 sampleColor = float3 (0);
+//        float4 sampleColor = float4(0, 0, 0, 1);
 
         while(xyz.z <= 1.0 && xyz.x <= 1.0 && xyz.y <= 1.0) {
 
             xyz += r.direction * 0.005;
             sample = brickPool.sample(colorSampler, xyz).a;
             if(sample >= uniforms.isoValue) {
-                float val = sample / uniforms.maxValue;
-                sampleColor = float4(val, val, val, 1);
+//                float val = sample / uniforms.maxValue;
+//                sampleColor = float4(val, val, val, 1);
+                sampleColor = float3 ((brickPool.sample(colorSampler, xyz).xyz /100) + 1) ;
                 break;
             }
         }
         
-        dstTex.write(sampleColor, tid);
+        dstTex.write(float4(sampleColor,1), tid);
     }
 }
 
@@ -130,14 +132,67 @@ kernel void calculateGradient(constant Uniforms & uniforms [[buffer(1)]],
                               texture3d<uint, access::read_write> brickPool [[texture(BrickPoolIndex)]],
                               uint3 tid [[thread_position_in_grid]])
 {    
+    uint3 refVoxel = tid;
     uint3 voxel = tid;
 
     uint sample = brickPool.read(voxel).a;
-
-//    voxel.x += 1;
-//    sample = brickPool.read(tid).a;
-
-    brickPool.write(uint4(0, 0, 0, sample), tid);
+    sample = brickPool.read(tid).a;
+    
+//    if (sample == 0){
+//        return;
+//    }
+    if(tid.x == 0){
+        brickPool.write(uint4(0, 100, 100, sample), tid);
+        return;
+    }else if (tid.y == 0){
+        brickPool.write(uint4(100, 0, 100, sample), tid);
+        return;
+    }else if (tid.z == 0){
+        brickPool.write(uint4(100, 100, 0, sample), tid);
+        return;
+    }else if (tid.x == uniforms.width-1){
+        brickPool.write(uint4(200, 100, 100, sample), tid);
+        return;
+    }else if (tid.y == uniforms.height-1){
+        brickPool.write(uint4(100, 200, 100, sample), tid);
+        return;
+    }else if (tid.z == uniforms.depth-1){
+        brickPool.write(uint4(100, 100, 200, sample), tid);
+        return;
+    }
+    
+    //total 9 + 9 + 8
+    uint surroundingValue = 0;
+    uint k = 0;
+    uint delta = 0;
+    uint originalValue = 0;
+    uint maxGradientValue = 0; //should this be negative in any case?
+    uint3 maxGradient = {0};
+    
+    for(uint x = refVoxel.x-1 ; x<=refVoxel.x+1 ; x++){
+        for(uint y = refVoxel.y-1 ; y<=refVoxel.y+1 ; y++){
+            for(uint z = refVoxel.z-1 ; z<=refVoxel.z+1 ; z++){
+                voxel.x = x;
+                voxel.y = y;
+                voxel.z = z;
+                surroundingValue = brickPool.read(voxel).a;
+                originalValue = brickPool.read(refVoxel).a;
+                delta = abs(surroundingValue-originalValue);
+                if (maxGradientValue <= delta && delta != 0){ //not considered multiple max values
+//                    maxGradient[k] = voxel; //store that voxel x,y,z
+//                    k++;
+                    maxGradientValue = surroundingValue;
+                    maxGradient = voxel;
+                }
+            }
+        }
+    }
+    if(maxGradientValue != 0){
+        uint3 ret = uint3(normalize(float3(maxGradient - refVoxel)+1) * 100);
+        brickPool.write(uint4(ret.x, ret.y, ret.z, sample), tid);
+    }
+    
+//    brickPool.write(uint4(0, 0, 0, sample), tid);
 }
 
 // Screen filling quad in normalized device coordinates.
