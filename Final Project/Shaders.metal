@@ -109,18 +109,41 @@ kernel void interceptBricks(acceleration_structure<> primStruct [[buffer(0)]],
         xyz.z /= uniforms.dFactor.z;
 
         float sample = brickPool.sample(colorSampler, xyz).a;
-        float3 sampleColor = float3 (0);
+        float3 sampleColor = {0};
+        float3 view = {0};
+        float3 normal = {0};
+        float3 n = {0};
+        float3 l = {0};
+        float3 h = {0};
+        
+        float4 pos = {0};
+        float4 lpos = {0};
+        
+        float3 diffuse = {0.5, 0.5, 0.5};
+        float3 specular = {1, 1, 1};
+        float shininess = 128;
 
-        while(xyz.z <= 1.0 && xyz.x <= 1.0 && xyz.y <= 1.0) {
+        while(xyz.x <= 1.0 && xyz.y <= 1.0 && xyz.z <= 1.0 &&
+              xyz.x >= 0.0 && xyz.y >= 0.0 && xyz.z >= 0.0) {
+            
             xyz += r.direction * 0.005;
             sample = brickPool.sample(colorSampler, xyz).a;
             if(sample >= uniforms.isoValue) {
-                sampleColor = float3 ((brickPool.sample(colorSampler, xyz).xyz /100) - 1) ;
+                pos = uniforms.modelViewMatrix * float4(xyz, 1);
+                lpos = uniforms.modelViewMatrix * float4(uniforms.lightPos, 1);
+                
+                view = normalize( -pos.xyz );
+                normal = float3(( brickPool.sample( colorSampler, xyz ).xyz / 100 ) - 1);
+                n = normalize( uniforms.normalMatrix * float4( normal, 0 ) ).xyz;
+                l = normalize( lpos.xyz - pos.xyz );
+                h = normalize( view + l );
+                
+                sampleColor = diffuse * max( 0.0, dot( n, l ) ) + specular * pow( max( 0.0, dot( n, h ) ), shininess );
                 break;
             }
         }
         
-        dstTex.write(float4(sampleColor,1), tid);
+        dstTex.write( float4( sampleColor, 1 ), tid );
     }
 }
 

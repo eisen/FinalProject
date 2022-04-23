@@ -451,6 +451,7 @@ class Renderer: NSObject, MTKViewDelegate {
         //print(target + rotatedVector.xyz)
         
         uniforms[0].projectionMatrix = projectionMatrix
+        uniforms[0].lightPos = [0, 0, 2]
 
         let rotationAxis = SIMD3<Float>(0, 1, 0)
         let modelMatrix = matrix4x4_rotation(radians: 0, axis: rotationAxis)
@@ -458,6 +459,9 @@ class Renderer: NSObject, MTKViewDelegate {
         
         uniforms[0].modelMatrix = modelMatrix
         uniforms[0].modelViewMatrix = simd_mul(viewMatrix, modelMatrix)
+        
+        let normalMatrix = uniforms[0].modelViewMatrix.inverse
+        uniforms[0].normalMatrix = normalMatrix.transpose
         
         if(self.size != nil) {
             uniforms[0].width = UInt32(self.size!.width)
