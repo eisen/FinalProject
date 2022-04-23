@@ -751,7 +751,7 @@
                             <slider verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="DvB-sf-61t">
                                 <rect key="frame" x="18" y="44" width="763" height="28"/>
                                 <autoresizingMask key="autoresizingMask" widthSizable="YES" flexibleMaxY="YES"/>
-                                <sliderCell key="cell" continuous="YES" state="on" alignment="left" minValue="-25" maxValue="25" tickMarkPosition="above" numberOfTickMarks="5" sliderType="linear" id="mGW-pE-23k"/>
+                                <sliderCell key="cell" continuous="YES" state="on" alignment="left" minValue="-24" maxValue="24" tickMarkPosition="above" numberOfTickMarks="5" sliderType="linear" id="mGW-pE-23k"/>
                                 <connections>
                                     <action selector="updateYawValue:" target="XfG-lQ-9wD" id="D8o-uG-iDI"/>
                                 </connections>
@@ -759,7 +759,7 @@
                             <slider horizontalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="JAh-OA-EKM">
                                 <rect key="frame" x="18" y="72" width="24" height="459"/>
                                 <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" heightSizable="YES"/>
-                                <sliderCell key="cell" continuous="YES" alignment="left" minValue="-25" maxValue="25" tickMarkPosition="right" numberOfTickMarks="5" sliderType="linear" id="2bx-1u-8DA"/>
+                                <sliderCell key="cell" continuous="YES" alignment="left" minValue="-24" maxValue="24" tickMarkPosition="right" numberOfTickMarks="5" sliderType="linear" id="2bx-1u-8DA"/>
                                 <connections>
                                     <action selector="updatePitchValue:" target="XfG-lQ-9wD" id="5B3-MF-myv"/>
                                 </connections>
