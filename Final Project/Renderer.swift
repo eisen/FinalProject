@@ -150,13 +150,10 @@ class Renderer: NSObject, MTKViewDelegate {
                 let vc = self.metalKitView.nextResponder as! GameViewController
                 vc.setProgressStatus(text: "Processing raw data...")
             }
-            var byte: UInt64 = 0
-            for (idx, elem) in data.enumerated() {
-                let pos = idx % 2
-                if pos == 0 {
-                    byte = UInt64(elem) << 48 // Little endian
-                } else {
-                    voxels.append( byte | UInt64(elem) << 56)
+            
+            data.withUnsafeBytes { bytes in
+                for idx in stride(from: 0, to: bytes.count, by: 2) {
+                    voxels.append( UInt64(bytes[idx]) << 48 | UInt64(bytes[idx+1]) << 56 )
                 }
             }
             
