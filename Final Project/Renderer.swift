@@ -97,6 +97,10 @@ class Renderer: NSObject, MTKViewDelegate {
             var voxels: [UInt32] = []
             let brickPoolDesc = MTLTextureDescriptor.init()
             
+            DispatchQueue.main.async {
+                let vc = self.metalKitView.nextResponder as! GameViewController
+                vc.setProgressStatus(text: "Processing raw data...")
+            }
             for byte in data {
                 voxels.append(UInt32(byte) << 24) // Little endian
             }
@@ -123,6 +127,11 @@ class Renderer: NSObject, MTKViewDelegate {
             
             let region = MTLRegionMake3D(0, 0, 0, Int(dim.x), Int(dim.y), Int(dim.z))
             self.brickPool!.replace(region: region, mipmapLevel: 0, slice: 0, withBytes: voxels, bytesPerRow: Int(dim.x) * MemoryLayout<UInt32>.size, bytesPerImage: Int(dim.x) * Int(dim.y) * MemoryLayout<UInt32>.size)
+            
+            DispatchQueue.main.async {
+                let vc = self.metalKitView.nextResponder as! GameViewController
+                vc.setProgressStatus(text: "Computing gradient...")
+            }
             self.calculateGradient(dim: dim)
             
             DispatchQueue.main.async {
@@ -137,6 +146,10 @@ class Renderer: NSObject, MTKViewDelegate {
             var voxels: [UInt64] = []
             let brickPoolDesc = MTLTextureDescriptor.init()
             
+            DispatchQueue.main.async {
+                let vc = self.metalKitView.nextResponder as! GameViewController
+                vc.setProgressStatus(text: "Processing raw data...")
+            }
             var byte: UInt64 = 0
             for (idx, elem) in data.enumerated() {
                 let pos = idx % 2
@@ -169,6 +182,11 @@ class Renderer: NSObject, MTKViewDelegate {
             
             let region = MTLRegionMake3D(0, 0, 0, Int(dim.x), Int(dim.y), Int(dim.z))
             self.brickPool!.replace(region: region, mipmapLevel: 0, slice: 0, withBytes: voxels, bytesPerRow: Int(dim.x) * MemoryLayout<UInt64>.size, bytesPerImage: Int(dim.x) * Int(dim.y) * MemoryLayout<UInt64>.size)
+            
+            DispatchQueue.main.async {
+                let vc = self.metalKitView.nextResponder as! GameViewController
+                vc.setProgressStatus(text: "Computing gradient...")
+            }
             self.calculateGradient(dim: dim)
             
             DispatchQueue.main.async {

@@ -152,6 +152,10 @@ class GameViewController: NSViewController, NSOpenSavePanelDelegate {
         print("\(String(describing: fileURL))")
     }
     
+    public func setProgressStatus(text: String) {
+        self.progressStatus.stringValue = text
+    }
+    
     func loadVolumeSet16(datFile: URL, width: Int32, height: Int32, depth: Int32) {
         progressStatus.stringValue = "Loading \(datFile.lastPathComponent)..."
         
