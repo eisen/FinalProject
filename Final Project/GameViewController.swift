@@ -16,6 +16,8 @@ class GameViewController: NSViewController, NSOpenSavePanelDelegate {
     
     let rawView = RawView()
     
+    let defaults = UserDefaults.standard
+    
     @IBOutlet var progressBar: NSProgressIndicator!
     @IBOutlet var progressStatus: NSTextField!
     @IBOutlet var fpsLabel: NSTextField!
@@ -78,6 +80,10 @@ class GameViewController: NSViewController, NSOpenSavePanelDelegate {
 
         let myFileDialog = NSOpenPanel()
         
+        self.rawView.width.intValue = Int32(defaults.integer(forKey: "Width"))
+        self.rawView.height.intValue = Int32(defaults.integer(forKey: "Height"))
+        self.rawView.depth.intValue = Int32(defaults.integer(forKey: "Depth"))
+        
         myFileDialog.accessoryView = self.rawView
         myFileDialog.delegate = self
         myFileDialog.isAccessoryViewDisclosed = true
@@ -89,6 +95,10 @@ class GameViewController: NSViewController, NSOpenSavePanelDelegate {
             let width = Int32(self.rawView.GetWidth())
             let height = Int32(self.rawView.GetHeight())
             let depth = Int32(self.rawView.GetDepth())
+            
+            defaults.set(width, forKey: "Width")
+            defaults.set(height, forKey: "Height")
+            defaults.set(depth, forKey: "Depth")
             
             self.ShowProgress()
             
