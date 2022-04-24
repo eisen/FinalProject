@@ -37,9 +37,10 @@ class Renderer: NSObject, MTKViewDelegate {
     var pipelineState: MTLRenderPipelineState
     var rtPipelineState: MTLComputePipelineState?
     var depthState: MTLDepthStencilState
-    var colorMap: MTLTexture
     
     var accumulationTargets: [MTLTexture] = []
+    var denoiserTargets: [MTLTexture] = []
+    var depthTexture: MTLTexture?
     var accumulationTargetIdx = 1
     
     var intersectionFunctionTable: MTLIntersectionFunctionTable?
@@ -86,7 +87,80 @@ class Renderer: NSObject, MTKViewDelegate {
     var position: float3 = [0, 0, -2.5]
     var dFactor: float3 = [1.0, 1.0, 1.0]
     
+    var width: Int32 = 0;
+    var height: Int32 = 0;
+    var depth: Int32 = 0;
+    var maxDim: Int = 0;
+    
     //var macroCellPool: MTLTexture?
+    
+    init?(metalKitView: MTKView) {
+        self.device = metalKitView.device!
+        self.metalKitView = metalKitView
+        self.commandQueue = self.device.makeCommandQueue()!
+
+        let uniformBufferSize = alignedUniformsSize * maxBuffersInFlight
+
+        self.dynamicUniformBuffer = self.device.makeBuffer(length:uniformBufferSize,
+                                                           options:[MTLResourceOptions.storageModeShared])!
+
+        self.dynamicUniformBuffer.label = "Uniforms Buffer"
+
+        uniforms = UnsafeMutableRawPointer(dynamicUniformBuffer.contents()).bindMemory(to:Uniforms.self, capacity:1)
+
+        metalKitView.depthStencilPixelFormat = MTLPixelFormat.depth32Float_stencil8
+        metalKitView.colorPixelFormat = MTLPixelFormat.bgra8Unorm_srgb
+        metalKitView.sampleCount = 1
+
+        let mtlVertexDescriptor = Renderer.buildMetalVertexDescriptor()
+
+        do {
+            pipelineState = try Renderer.buildRenderPipelineWithDevice(device: device,
+                                                                       metalKitView: metalKitView,
+                                                                       mtlVertexDescriptor: mtlVertexDescriptor)
+        } catch {
+            print("Unable to compile render pipeline state.  Error info: \(error)")
+            return nil
+        }
+
+        let depthStateDescriptor = MTLDepthStencilDescriptor()
+        depthStateDescriptor.depthCompareFunction = MTLCompareFunction.less
+        depthStateDescriptor.isDepthWriteEnabled = true
+        
+        self.depthState = device.makeDepthStencilState(descriptor:depthStateDescriptor)!
+
+        do {
+            mesh = try Renderer.buildMesh(device: device, mtlVertexDescriptor: mtlVertexDescriptor)
+        } catch {
+            print("Unable to build MetalKit Mesh. Error info: \(error)")
+            return nil
+        }
+        
+        let depthTextureDesc = MTLTextureDescriptor()
+        depthTextureDesc.pixelFormat = .rgba16Float
+        depthTextureDesc.textureType = .type2D
+        depthTextureDesc.width = 128
+        depthTextureDesc.height = 128
+        depthTextureDesc.usage = [.shaderRead, .renderTarget]
+        
+        depthTexture = self.device.makeTexture(descriptor: depthTextureDesc)!
+
+        super.init()
+        
+        self.updateGameState()
+        
+        self.createAccelerationDesc()
+        
+        do {
+            rtPipelineState = try self.buildComputePipelineWithDevice(device: device,
+                                                                       metalKitView: metalKitView,
+                                                                       mtlVertexDescriptor: mtlVertexDescriptor)
+        } catch {
+            print("Unable to compile render pipeline state.  Error info: \(error)")
+            return nil
+        }
+
+    }
     
     public func SetScalarSize(size: ScalarSize) {
         self.scalarSize = size
@@ -111,13 +185,17 @@ class Renderer: NSObject, MTKViewDelegate {
             brickPoolDesc.depth = Int(dim.z)
             brickPoolDesc.pixelFormat = .rgba8Uint
             brickPoolDesc.usage = [.shaderRead, .shaderWrite]
+            brickPoolDesc.storageMode = .shared
             
             self.isoValue = 0
             scalarSize = .BITS_8
             
-            var maxDim = max(Int(dim.x), Int(dim.y), Int(dim.z))
+            maxDim = max(Int(dim.x), Int(dim.y), Int(dim.z))
             maxDim = Int(pow(2.0, ceil(log(Double(maxDim))/log(2))))
             
+            width = dim.x
+            height = dim.y
+            depth = dim.z
             dFactor.x = Float(dim.x) / Float(maxDim)
             dFactor.y = Float(dim.y) / Float(maxDim)
             dFactor.z = Float(dim.z) / Float(maxDim)
@@ -167,9 +245,12 @@ class Renderer: NSObject, MTKViewDelegate {
             scalarSize = .BITS_16
             self.isoValue = 0
             
-            var maxDim = max(Int(dim.x), Int(dim.y), Int(dim.z))
+            maxDim = max(Int(dim.x), Int(dim.y), Int(dim.z))
             maxDim = Int(pow(2.0, ceil(log(Double(maxDim))/log(2))))
             
+            width = dim.x
+            height = dim.y
+            depth = dim.z
             dFactor.x = Float(dim.x) / Float(maxDim)
             dFactor.y = Float(dim.y) / Float(maxDim)
             dFactor.z = Float(dim.z) / Float(maxDim)
@@ -238,72 +319,6 @@ class Renderer: NSObject, MTKViewDelegate {
         commandBuffer?.waitUntilCompleted()
     }
 
-    init?(metalKitView: MTKView) {
-        self.device = metalKitView.device!
-        self.metalKitView = metalKitView
-        self.commandQueue = self.device.makeCommandQueue()!
-
-        let uniformBufferSize = alignedUniformsSize * maxBuffersInFlight
-
-        self.dynamicUniformBuffer = self.device.makeBuffer(length:uniformBufferSize,
-                                                           options:[MTLResourceOptions.storageModeShared])!
-
-        self.dynamicUniformBuffer.label = "Uniforms Buffer"
-
-        uniforms = UnsafeMutableRawPointer(dynamicUniformBuffer.contents()).bindMemory(to:Uniforms.self, capacity:1)
-
-        metalKitView.depthStencilPixelFormat = MTLPixelFormat.depth32Float_stencil8
-        metalKitView.colorPixelFormat = MTLPixelFormat.bgra8Unorm_srgb
-        metalKitView.sampleCount = 1
-
-        let mtlVertexDescriptor = Renderer.buildMetalVertexDescriptor()
-
-        do {
-            pipelineState = try Renderer.buildRenderPipelineWithDevice(device: device,
-                                                                       metalKitView: metalKitView,
-                                                                       mtlVertexDescriptor: mtlVertexDescriptor)
-        } catch {
-            print("Unable to compile render pipeline state.  Error info: \(error)")
-            return nil
-        }
-
-        let depthStateDescriptor = MTLDepthStencilDescriptor()
-        depthStateDescriptor.depthCompareFunction = MTLCompareFunction.less
-        depthStateDescriptor.isDepthWriteEnabled = true
-        
-        self.depthState = device.makeDepthStencilState(descriptor:depthStateDescriptor)!
-
-        do {
-            mesh = try Renderer.buildMesh(device: device, mtlVertexDescriptor: mtlVertexDescriptor)
-        } catch {
-            print("Unable to build MetalKit Mesh. Error info: \(error)")
-            return nil
-        }
-
-        do {
-            colorMap = try Renderer.loadTexture(device: device, textureName: "ColorMap")
-        } catch {
-            print("Unable to load texture. Error info: \(error)")
-            return nil
-        }
-
-        super.init()
-        
-        self.updateGameState()
-        
-        self.createAccelerationDesc()
-        
-        do {
-            rtPipelineState = try self.buildComputePipelineWithDevice(device: device,
-                                                                       metalKitView: metalKitView,
-                                                                       mtlVertexDescriptor: mtlVertexDescriptor)
-        } catch {
-            print("Unable to compile render pipeline state.  Error info: \(error)")
-            return nil
-        }
-
-    }
-
     class func buildMetalVertexDescriptor() -> MTLVertexDescriptor {
         // Create a Metal vertex descriptor specifying how vertices will by laid out for input into our render
         //   pipeline and how we'll layout our Model IO vertices
@@ -349,7 +364,7 @@ class Renderer: NSObject, MTKViewDelegate {
         let library = device.makeDefaultLibrary()!
 
         let computePipelineDesc = MTLComputePipelineDescriptor()
-        computePipelineDesc.computeFunction = library.makeFunction(name: "interceptBricks")!
+        computePipelineDesc.computeFunction = library.makeFunction(name: "interceptCube")!
         
         let computePipelineState = try device.makeComputePipelineState(descriptor: computePipelineDesc, options: .bufferTypeInfo, reflection: nil)
         
@@ -361,7 +376,7 @@ class Renderer: NSObject, MTKViewDelegate {
         let library = device.makeDefaultLibrary()!
 
         let computePipelineDesc = MTLComputePipelineDescriptor()
-        computePipelineDesc.computeFunction = library.makeFunction(name: "calculateGradient")!
+        computePipelineDesc.computeFunction = library.makeFunction(name: "calculateNormal")!
         
         let computePipelineState = try device.makeComputePipelineState(descriptor: computePipelineDesc, options: .bufferTypeInfo, reflection: nil)
         
@@ -466,7 +481,7 @@ class Renderer: NSObject, MTKViewDelegate {
         //print(target + rotatedVector.xyz)
         
         uniforms[0].projectionMatrix = projectionMatrix
-        uniforms[0].lightPos = [0, 0, -2]
+        uniforms[0].lightPos = [0, 2.5, -2.5]
 
         let rotationAxis = SIMD3<Float>(0, 1, 0)
         let modelMatrix = matrix4x4_rotation(radians: 0, axis: rotationAxis)
@@ -479,8 +494,8 @@ class Renderer: NSObject, MTKViewDelegate {
         uniforms[0].normalMatrix = normalMatrix.transpose
         
         if(self.size != nil) {
-            uniforms[0].width = UInt32(self.size!.width)
-            uniforms[0].height = UInt32(self.size!.height)
+            uniforms[0].tWidth = UInt32(self.size!.width)
+            uniforms[0].tHeight = UInt32(self.size!.height)
         }
         let mat = viewMatrix.transpose
         uniforms[0].camera.position = position
@@ -497,6 +512,12 @@ class Renderer: NSObject, MTKViewDelegate {
         
         uniforms[0].dFactor = dFactor
         uniforms[0].isoValue = isoValue
+        
+        uniforms[0].width = UInt32(self.width)
+        uniforms[0].height = UInt32(self.height)
+        uniforms[0].depth = UInt32(self.depth)
+        
+        uniforms[0].maxDim = Float(self.maxDim)
     }
     
 //    private func generateWorkingSet() {
@@ -584,6 +605,8 @@ class Renderer: NSObject, MTKViewDelegate {
             let renderPassDescriptor = view.currentRenderPassDescriptor
 
             if let renderPassDescriptor = renderPassDescriptor {
+                
+                accumulationTargetIdx = 1 - accumulationTargetIdx
 
                 /// Final pass rendering code here
                 if let renderEncoder = commandBuffer.makeRenderCommandEncoder(descriptor: renderPassDescriptor) {
@@ -591,9 +614,10 @@ class Renderer: NSObject, MTKViewDelegate {
 
                     renderEncoder.pushDebugGroup("Draw Compute Output")
 
-                    accumulationTargetIdx = 1 - accumulationTargetIdx
+                    
                     renderEncoder.setRenderPipelineState(pipelineState)
                     renderEncoder.setFragmentTexture(accumulationTargets[accumulationTargetIdx], index: 0)
+                    
                     renderEncoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 6)
                     
                     renderEncoder.endEncoding()
@@ -625,8 +649,10 @@ class Renderer: NSObject, MTKViewDelegate {
         textureDesc.usage = [.shaderWrite, .shaderRead]
         
         accumulationTargets.removeAll()
+        denoiserTargets.removeAll()
         for _ in 0..<2 {
             accumulationTargets.append(self.device.makeTexture(descriptor: textureDesc)!)
+            denoiserTargets.append(self.device.makeTexture(descriptor: textureDesc)!)
         }
     }
 }

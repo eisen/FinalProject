@@ -55,8 +55,12 @@ typedef struct
     unsigned int width;
     unsigned int height;
     unsigned int depth;
+    float maxDim;
     Camera camera;
     vector_float3 lightPos;
+    
+    unsigned int tWidth;
+    unsigned int tHeight;
     
     float maxValue;
     float isoValue;
