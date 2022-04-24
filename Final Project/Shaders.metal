@@ -123,7 +123,7 @@ kernel void interceptCube(acceleration_structure<> primStruct [[buffer(0)]],
         float4 pos = {0};
         float4 lpos = {0};
         
-        float3 ambient = {0.0, 0.0, 0.0};
+        float3 ambient = {0.1, 0.1, 0.1};
         float3 diffuse = {0.5, 0.5, 0.5};
         float3 specular = {1, 1, 1};
         float shininess = 2;
