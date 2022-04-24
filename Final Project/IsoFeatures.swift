@@ -2,7 +2,7 @@
 //  IsoFeatures.swift
 //  Final Project
 //
-//  Created by Eisen Montalvo on 4/20/22.
+//  Created by Nishita Kharche & Eisen Montalvo on 4/20/22.
 //
 
 import Foundation

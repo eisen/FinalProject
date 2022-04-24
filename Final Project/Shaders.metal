@@ -2,7 +2,7 @@
 //  Shaders.metal
 //  Final Project
 //
-//  Created by Eisen Montalvo on 4/3/22.
+//  Created by Nishita Kharche & Eisen Montalvo on 4/3/22.
 //
 
 // File for Metal kernel and shader functions

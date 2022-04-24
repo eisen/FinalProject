@@ -2,7 +2,7 @@
 //  Renderer.swift
 //  Final Project
 //
-//  Created by Eisen Montalvo on 4/3/22.
+//  Created by Nishita Kharche & Eisen Montalvo on 4/3/22.
 //
 
 // Our platform independent renderer class
@@ -478,7 +478,6 @@ class Renderer: NSObject, MTKViewDelegate {
         let distanceVector = float4(0, distance, -distance, 0)
         let rotatedVector = rotateMatrix * distanceVector
         position = target + rotatedVector.xyz
-        //print(target + rotatedVector.xyz)
         
         uniforms[0].projectionMatrix = projectionMatrix
         uniforms[0].lightPos = [0, 2.5, -2.5]
