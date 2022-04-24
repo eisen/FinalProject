@@ -84,7 +84,7 @@ class Renderer: NSObject, MTKViewDelegate {
     public var rotation: float3 = [0, 0, 0]
     var target: float3 = [0, 0, 0]
     var distance: Float = 2.5
-    var position: float3 = [0, 0, -2.5]
+    var position: float3 = [0, 2.5, -2.5]
     var dFactor: float3 = [1.0, 1.0, 1.0]
     
     var width: Int32 = 0;
@@ -474,8 +474,8 @@ class Renderer: NSObject, MTKViewDelegate {
         /// Update any game state before rendering
         
         let rotateMatrix = float4x4(
-          rotationYXZ: [-rotation.x, rotation.y, 0])
-        let distanceVector = float4(0, 0, -distance, 0)
+            rotationYXZ: [-rotation.x, rotation.y, rotation.z])
+        let distanceVector = float4(0, distance, -distance, 0)
         let rotatedVector = rotateMatrix * distanceVector
         position = target + rotatedVector.xyz
         //print(target + rotatedVector.xyz)

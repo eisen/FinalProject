@@ -86,7 +86,7 @@ kernel void interceptCube(acceleration_structure<> primStruct [[buffer(0)]],
         
         r.origin = camera.position;
         r.direction = normalize((uv.x - 0.5) * camera.right + (uv.y - 0.5) * camera.up + camera.forward);
-        r.max_distance = 4;
+        r.max_distance = 10;
         
         intersector<triangle_data> intersector;
         intersection_result<triangle_data> intersection;

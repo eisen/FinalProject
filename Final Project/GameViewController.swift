@@ -25,6 +25,7 @@ class GameViewController: NSViewController, NSOpenSavePanelDelegate {
     @IBOutlet var isoSlider: NSSlider!
     @IBOutlet var pitchSlider: NSSlider!
     @IBOutlet var yawSlider: NSSlider!
+    @IBOutlet var rollSlider: NSSlider!
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -73,6 +74,12 @@ class GameViewController: NSViewController, NSOpenSavePanelDelegate {
     func updateYawValue(_ sender: NSSlider) {
         let value = (sender.floatValue / 50.0) * Float.pi
         self.renderer.rotation[1] = value
+    }
+    
+    @IBAction
+    func updateRollValue(_ sender: NSSlider) {
+        let value = (sender.floatValue / 50.0) * Float.pi
+        self.renderer.rotation[2] = value
     }
     
     @IBAction

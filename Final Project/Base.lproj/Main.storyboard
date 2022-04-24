@@ -764,6 +764,14 @@
                                     <action selector="updatePitchValue:" target="XfG-lQ-9wD" id="5B3-MF-myv"/>
                                 </connections>
                             </slider>
+                            <slider horizontalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="eFd-0e-eRL">
+                                <rect key="frame" x="757" y="68" width="24" height="459"/>
+                                <autoresizingMask key="autoresizingMask" flexibleMinX="YES" heightSizable="YES"/>
+                                <sliderCell key="cell" continuous="YES" alignment="left" minValue="-24" maxValue="24" tickMarkPosition="right" numberOfTickMarks="5" sliderType="linear" id="lcK-VT-k28"/>
+                                <connections>
+                                    <action selector="updateRollValue:" target="XfG-lQ-9wD" id="Kp4-Qt-sSq"/>
+                                </connections>
+                            </slider>
                         </subviews>
                     </view>
                     <connections>
@@ -773,6 +781,7 @@
                         <outlet property="pitchSlider" destination="JAh-OA-EKM" id="o8w-fl-3FZ"/>
                         <outlet property="progressBar" destination="8Hx-vz-33U" id="Ar6-j7-iBV"/>
                         <outlet property="progressStatus" destination="Tr1-qp-yUp" id="XJP-CH-FUL"/>
+                        <outlet property="rollSlider" destination="eFd-0e-eRL" id="JS1-FO-oFU"/>
                         <outlet property="yawSlider" destination="DvB-sf-61t" id="s6L-AQ-SJ8"/>
                     </connections>
                 </viewController>
