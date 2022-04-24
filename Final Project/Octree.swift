@@ -1,8 +1,8 @@
 //
 //  Octree.swift
 //  Final Project
-//
-//  Created by Nishita Kharche & Eisen Montalvo on 4/8/22.
+//  Source: https://github.com/raywenderlich/swift-algorithm-club/blob/master/Octree/Octree.playground/Sources/Octree.swift
+//  Modified by Nishita Kharche & Eisen Montalvo on 4/8/22.
 //
 
 import Foundation

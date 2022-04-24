@@ -344,11 +344,11 @@ class GameViewController: NSViewController, NSOpenSavePanelDelegate {
 //            let end = CFAbsoluteTimeGetCurrent()
 //            print("Took \(end-start) seconds")
 //
-////            DispatchQueue.main.async {
-////                self.progressStatus.stringValue = "Exporting bricks..."
-////            }
-////
-////            ocTree.exportBricks(folder: URL(fileURLWithPath: datFile.path).deletingLastPathComponent())
+//            DispatchQueue.main.async {
+//                self.progressStatus.stringValue = "Exporting bricks..."
+//            }
+//
+//            ocTree.exportBricks(folder: URL(fileURLWithPath: datFile.path).deletingLastPathComponent())
 //
 //            DispatchQueue.main.async {
 //                self.HideProgress()
