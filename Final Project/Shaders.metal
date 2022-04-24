@@ -148,15 +148,16 @@ kernel void interceptBricks(acceleration_structure<> primStruct [[buffer(0)]],
     }
 }
 
-float3 calculateDerivatives(float3 p, float3 c) {
-    
-    float dist = distance(p,c);
+float3 calculateDerivatives(uint3 p, uint3 c) {
+    float3 pf = float3(p);
+    float3 cf = float3(c);
+    float dist = distance(pf,cf);
     float distCubed = pow(dist, 3);
     float3 out;
     
-    out.x = c.x - p.x;
-    out.y = c.y - p.y;
-    out.z = c.z - p.z;
+    out.x = cf.x - pf.x;
+    out.y = cf.y - pf.y;
+    out.z = cf.z - pf.z;
     
     return out / distCubed;
 }
