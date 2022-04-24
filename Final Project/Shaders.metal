@@ -148,6 +148,19 @@ kernel void interceptBricks(acceleration_structure<> primStruct [[buffer(0)]],
     }
 }
 
+float3 calculateDerivatives(float3 p, float3 c) {
+    
+    float dist = distance(p,c);
+    float distCubed = pow(dist, 3);
+    float3 out;
+    
+    out.x = c.x - p.x;
+    out.y = c.y - p.y;
+    out.z = c.z - p.z;
+    
+    return out / distCubed;
+}
+
 kernel void calculateGradient(constant Uniforms & uniforms [[buffer(1)]],
                               texture3d<uint, access::read_write> brickPool [[texture(BrickPoolIndex)]],
                               uint3 tid [[thread_position_in_grid]])
