@@ -83,14 +83,7 @@ class GameViewController: NSViewController, NSOpenSavePanelDelegate {
         self.rawView.width.intValue = Int32(defaults.integer(forKey: "Width"))
         self.rawView.height.intValue = Int32(defaults.integer(forKey: "Height"))
         self.rawView.depth.intValue = Int32(defaults.integer(forKey: "Depth"))
-        switch ScalarSize(rawValue: defaults.integer(forKey: "Scalar Size")) {
-        case .BITS_8:
-            self.rawView.byte.state = .on
-        case .BITS_16:
-            self.rawView.word.state = .on
-        case .none:
-            self.rawView.byte.state = .on
-        }
+        self.rawView.SetScalarSize(size: ScalarSize(rawValue: defaults.integer(forKey: "Scalar Size"))!)
         
         myFileDialog.accessoryView = self.rawView
         myFileDialog.delegate = self

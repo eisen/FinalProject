@@ -772,8 +772,7 @@
                         <outlet property="isoSlider" destination="VTH-IB-tXD" id="Yp4-Oe-ec8"/>
                         <outlet property="pitchSlider" destination="JAh-OA-EKM" id="o8w-fl-3FZ"/>
                         <outlet property="progressBar" destination="8Hx-vz-33U" id="Ar6-j7-iBV"/>
-                        <outlet property="progressStatis" destination="Tr1-qp-yUp" id="iBX-RS-BDr"/>
-                        <outlet property="progressStatus" destination="Tr1-qp-yUp" id="jHn-oR-OJe"/>
+                        <outlet property="progressStatus" destination="Tr1-qp-yUp" id="XJP-CH-FUL"/>
                         <outlet property="yawSlider" destination="DvB-sf-61t" id="s6L-AQ-SJ8"/>
                     </connections>
                 </viewController>

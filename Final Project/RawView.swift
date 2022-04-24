@@ -36,6 +36,16 @@ class RawView: NSView {
         return scalarSize
     }
     
+    public func SetScalarSize(size: ScalarSize) {
+        scalarSize = size
+        switch scalarSize {
+        case .BITS_8:
+            byte.state = .on
+        case .BITS_16:
+            word.state = .on
+        }
+    }
+    
     public func GetWidth() -> Int {
         return width.integerValue
     }
