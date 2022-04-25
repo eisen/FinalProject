@@ -39,7 +39,6 @@ class Renderer: NSObject, MTKViewDelegate {
     var depthState: MTLDepthStencilState
     
     var accumulationTargets: [MTLTexture] = []
-    var denoiserTargets: [MTLTexture] = []
     var depthTexture: MTLTexture?
     var accumulationTargetIdx = 1
     
@@ -167,6 +166,7 @@ class Renderer: NSObject, MTKViewDelegate {
     }
     
     public func setVolumeData8(data: Data, dim: vector_int3) {
+        self.brickPool = nil
         DispatchQueue.global(qos: .userInitiated).async { [self] in
             var voxels: [UInt32] = []
             let brickPoolDesc = MTLTextureDescriptor.init()
@@ -220,6 +220,7 @@ class Renderer: NSObject, MTKViewDelegate {
     }
     
     public func setVolumeData16(data: Data, dim: vector_int3) {
+        self.brickPool = nil
         DispatchQueue.global(qos: .userInitiated).async { [self] in
             var voxels: [UInt64] = []
             let brickPoolDesc = MTLTextureDescriptor.init()
@@ -602,6 +603,8 @@ class Renderer: NSObject, MTKViewDelegate {
                 computeEncoder.dispatchThreadgroups(threadgroups, threadsPerThreadgroup: threadsPerThreadgroup)
                 
                 computeEncoder.endEncoding()
+            } else {
+                createRenderTextures() // Erase them to black on loading a new raw file
             }
             
             /// Delay getting the currentRenderPassDescriptor until we absolutely need it to avoid
@@ -645,18 +648,20 @@ class Renderer: NSObject, MTKViewDelegate {
         let aspect = Float(size.width) / Float(size.height)
         projectionMatrix = matrix_perspective_right_hand(fovyRadians: radians_from_degrees(65), aspectRatio:aspect, nearZ: 0.1, farZ: 100.0)
         
+        createRenderTextures()
+    }
+    
+    func createRenderTextures() {
         let textureDesc = MTLTextureDescriptor()
         textureDesc.pixelFormat = .rgba32Float
         textureDesc.textureType = .type2D
-        textureDesc.width = Int(size.width)
-        textureDesc.height = Int(size.height)
+        textureDesc.width = Int(self.size!.width)
+        textureDesc.height = Int(self.size!.height)
         textureDesc.usage = [.shaderWrite, .shaderRead]
         
         accumulationTargets.removeAll()
-        denoiserTargets.removeAll()
         for _ in 0..<2 {
             accumulationTargets.append(self.device.makeTexture(descriptor: textureDesc)!)
-            denoiserTargets.append(self.device.makeTexture(descriptor: textureDesc)!)
         }
     }
 }
