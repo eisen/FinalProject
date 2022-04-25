@@ -121,7 +121,7 @@ class GameViewController: NSViewController, NSOpenSavePanelDelegate {
                 self.isoSlider.intValue = 0
                 self.isoLabel.intValue = 0
                 self.renderer.isoValue = 0
-                self.loadVolumeSet16(datFile: url, width: width, height: height, depth: depth)
+                self.loadVolumeSet16(datFile: url, width: Int64(width), height: Int64(height), depth: Int64(depth))
             case .BITS_8:
                 //self.renderer.SetScalarSize(size: .BITS_8)
                 self.isoSlider.maxValue = 255
@@ -156,7 +156,7 @@ class GameViewController: NSViewController, NSOpenSavePanelDelegate {
         self.progressStatus.stringValue = text
     }
     
-    func loadVolumeSet16(datFile: URL, width: Int32, height: Int32, depth: Int32) {
+    func loadVolumeSet16(datFile: URL, width: Int64, height: Int64, depth: Int64) {
         progressStatus.stringValue = "Loading \(datFile.lastPathComponent)..."
         
         var data: Data?
@@ -171,7 +171,7 @@ class GameViewController: NSViewController, NSOpenSavePanelDelegate {
             return
         }
         
-        self.renderer.setVolumeData16(data: data!, dim: vector_int3(width, height, depth))
+        self.renderer.setVolumeData16(data: data!, dim: vector_int3(Int32(width), Int32(height), Int32(depth)))
 //        
 //        let brickDim = 128
 //        

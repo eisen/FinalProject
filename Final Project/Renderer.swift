@@ -62,7 +62,8 @@ class Renderer: NSObject, MTKViewDelegate {
     
     var intersector: MPSRayIntersector?
     
-    var brickPool: MTLTexture?
+    var rawPool: MTLTexture?
+    var volumePool: MTLTexture?
     
     var accStructDesc: MTLPrimitiveAccelerationStructureDescriptor?
     
@@ -166,26 +167,31 @@ class Renderer: NSObject, MTKViewDelegate {
     }
     
     public func setVolumeData8(data: Data, dim: vector_int3) {
-        self.brickPool = nil
+        self.rawPool = nil
         DispatchQueue.global(qos: .userInitiated).async { [self] in
-            var voxels: [UInt32] = []
-            let brickPoolDesc = MTLTextureDescriptor.init()
+            let rawPoolDesc = MTLTextureDescriptor.init()
+            let volumePoolDesc = MTLTextureDescriptor.init()
             
             DispatchQueue.main.async {
                 let vc = self.metalKitView.nextResponder as! GameViewController
                 vc.setProgressStatus(text: "Processing raw data...")
             }
-            for byte in data {
-                voxels.append(UInt32(byte) << 24) // Little endian
-            }
             
-            brickPoolDesc.textureType = .type3D
-            brickPoolDesc.width = Int(dim.x)
-            brickPoolDesc.height = Int(dim.y)
-            brickPoolDesc.depth = Int(dim.z)
-            brickPoolDesc.pixelFormat = .rgba8Uint
-            brickPoolDesc.usage = [.shaderRead, .shaderWrite]
-            brickPoolDesc.storageMode = .shared
+            rawPoolDesc.textureType = .type3D
+            rawPoolDesc.width = Int(dim.x)
+            rawPoolDesc.height = Int(dim.y)
+            rawPoolDesc.depth = Int(dim.z)
+            rawPoolDesc.pixelFormat = .r8Uint
+            rawPoolDesc.usage = [.shaderRead, .shaderWrite]
+            rawPoolDesc.storageMode = .shared
+            
+            volumePoolDesc.textureType = .type3D
+            volumePoolDesc.width = Int(dim.x)
+            volumePoolDesc.height = Int(dim.y)
+            volumePoolDesc.depth = Int(dim.z)
+            volumePoolDesc.pixelFormat = .rgba32Float
+            volumePoolDesc.usage = [.shaderRead, .shaderWrite]
+            volumePoolDesc.storageMode = .private
             
             self.isoValue = 0
             scalarSize = .BITS_8
@@ -200,16 +206,24 @@ class Renderer: NSObject, MTKViewDelegate {
             dFactor.y = Float(dim.y) / Float(maxDim)
             dFactor.z = Float(dim.z) / Float(maxDim)
             
-            self.brickPool = self.device.makeTexture(descriptor: brickPoolDesc)!
-            self.brickPool?.label = "Brick Pool UInt8"
+            self.rawPool = self.device.makeTexture(descriptor: rawPoolDesc)!
+            self.rawPool?.label = "Raw Pool UInt8"
+            
+            self.volumePool = self.device.makeTexture(descriptor: volumePoolDesc)!
+            self.volumePool?.label = "Volume Pool"
             
             let region = MTLRegionMake3D(0, 0, 0, Int(dim.x), Int(dim.y), Int(dim.z))
-            self.brickPool!.replace(region: region, mipmapLevel: 0, slice: 0, withBytes: voxels, bytesPerRow: Int(dim.x) * MemoryLayout<UInt32>.size, bytesPerImage: Int(dim.x) * Int(dim.y) * MemoryLayout<UInt32>.size)
+            data.withUnsafeBytes {bytes in
+                self.rawPool!.replace(region: region, mipmapLevel: 0, slice: 0, withBytes: bytes , bytesPerRow: Int(dim.x) * MemoryLayout<UInt8>.size, bytesPerImage: Int(dim.x) * Int(dim.y) * MemoryLayout<UInt8>.size)
+            }
             
             DispatchQueue.main.async {
                 let vc = self.metalKitView.nextResponder as! GameViewController
                 vc.setProgressStatus(text: "Computing gradient...")
             }
+            
+            self.convertTexture(dim: dim)
+            self.rawPool = nil
             self.calculateGradient(dim: dim)
             
             DispatchQueue.main.async {
@@ -220,28 +234,30 @@ class Renderer: NSObject, MTKViewDelegate {
     }
     
     public func setVolumeData16(data: Data, dim: vector_int3) {
-        self.brickPool = nil
+        self.rawPool = nil
         DispatchQueue.global(qos: .userInitiated).async { [self] in
-            var voxels: [UInt64] = []
-            let brickPoolDesc = MTLTextureDescriptor.init()
+            let rawPoolDesc = MTLTextureDescriptor.init()
+            let volumePoolDesc = MTLTextureDescriptor.init()
             
             DispatchQueue.main.async {
                 let vc = self.metalKitView.nextResponder as! GameViewController
                 vc.setProgressStatus(text: "Processing raw data...")
             }
             
-            data.withUnsafeBytes { bytes in
-                for idx in stride(from: 0, to: bytes.count, by: 2) {
-                    voxels.append( UInt64(bytes[idx]) << 48 | UInt64(bytes[idx+1]) << 56 )
-                }
-            }
+            rawPoolDesc.textureType = .type3D
+            rawPoolDesc.width = Int(dim.x)
+            rawPoolDesc.height = Int(dim.y)
+            rawPoolDesc.depth = Int(dim.z)
+            rawPoolDesc.pixelFormat = .r16Uint
+            rawPoolDesc.usage = [.shaderRead, .shaderWrite]
             
-            brickPoolDesc.textureType = .type3D
-            brickPoolDesc.width = Int(dim.x)
-            brickPoolDesc.height = Int(dim.y)
-            brickPoolDesc.depth = Int(dim.z)
-            brickPoolDesc.pixelFormat = .rgba16Uint
-            brickPoolDesc.usage = [.shaderRead, .shaderWrite]
+            volumePoolDesc.textureType = .type3D
+            volumePoolDesc.width = Int(dim.x)
+            volumePoolDesc.height = Int(dim.y)
+            volumePoolDesc.depth = Int(dim.z)
+            volumePoolDesc.pixelFormat = .rgba32Float
+            volumePoolDesc.usage = [.shaderRead, .shaderWrite]
+            volumePoolDesc.storageMode = .private
             
             scalarSize = .BITS_16
             self.isoValue = 0
@@ -256,16 +272,25 @@ class Renderer: NSObject, MTKViewDelegate {
             dFactor.y = Float(dim.y) / Float(maxDim)
             dFactor.z = Float(dim.z) / Float(maxDim)
             
-            self.brickPool = self.device.makeTexture(descriptor: brickPoolDesc)!
-            self.brickPool?.label = "Brick Pool UInt16"
+            self.rawPool = self.device.makeTexture(descriptor: rawPoolDesc)!
+            self.rawPool?.label = "Raw Pool UInt16"
+            
+            self.volumePool = self.device.makeTexture(descriptor: volumePoolDesc)!
+            self.volumePool?.label = "Volume Pool"
+            
             
             let region = MTLRegionMake3D(0, 0, 0, Int(dim.x), Int(dim.y), Int(dim.z))
-            self.brickPool!.replace(region: region, mipmapLevel: 0, slice: 0, withBytes: voxels, bytesPerRow: Int(dim.x) * MemoryLayout<UInt64>.size, bytesPerImage: Int(dim.x) * Int(dim.y) * MemoryLayout<UInt64>.size)
+            data.withUnsafeBytes {bytes in
+            self.rawPool!.replace(region: region, mipmapLevel: 0, slice: 0, withBytes: bytes, bytesPerRow: Int(dim.x) * MemoryLayout<UInt16>.size, bytesPerImage: Int(dim.x) * Int(dim.y) * MemoryLayout<UInt16>.size)
+            }
             
             DispatchQueue.main.async {
                 let vc = self.metalKitView.nextResponder as! GameViewController
                 vc.setProgressStatus(text: "Computing gradient...")
             }
+            
+            self.convertTexture(dim: dim)
+            //self.rawPool = nil
             self.calculateGradient(dim: dim)
             
             DispatchQueue.main.async {
@@ -371,6 +396,18 @@ class Renderer: NSObject, MTKViewDelegate {
         return computePipelineState
     }
     
+    func buildConversionPipelineWithDevice(device: MTLDevice,
+                                             metalKitView: MTKView) throws -> MTLComputePipelineState {
+        let library = device.makeDefaultLibrary()!
+
+        let computePipelineDesc = MTLComputePipelineDescriptor()
+        computePipelineDesc.computeFunction = library.makeFunction(name: "convertTexture")!
+        
+        let computePipelineState = try device.makeComputePipelineState(descriptor: computePipelineDesc, options: .bufferTypeInfo, reflection: nil)
+        
+        return computePipelineState
+    }
+    
     func buildGradientPipelineWithDevice(device: MTLDevice,
                                              metalKitView: MTKView) throws -> MTLComputePipelineState {
         let library = device.makeDefaultLibrary()!
@@ -381,6 +418,45 @@ class Renderer: NSObject, MTKViewDelegate {
         let computePipelineState = try device.makeComputePipelineState(descriptor: computePipelineDesc, options: .bufferTypeInfo, reflection: nil)
         
         return computePipelineState
+    }
+    
+    func convertTexture(dim: vector_int3) {
+        do {
+            let computePipeline = try self.buildConversionPipelineWithDevice(device: self.device, metalKitView: self.metalKitView)
+            let tw = computePipeline.threadExecutionWidth
+            let th = computePipeline.maxTotalThreadsPerThreadgroup / (tw * 4)
+            let td = th / 2
+            let threadsPerThreadgroup = MTLSizeMake(tw, th, td)
+            let width = Int(dim.x)
+            let height = Int(dim.y)
+            let depth = Int(dim.z)
+            uniforms[0].width = UInt32(width)
+            uniforms[0].height = UInt32(height)
+            uniforms[0].depth = UInt32(depth)
+            self.updateDynamicBufferState()
+            let threadgroups = MTLSizeMake((width + threadsPerThreadgroup.width - 1) / threadsPerThreadgroup.width,
+                                               (height + threadsPerThreadgroup.height - 1) / threadsPerThreadgroup.height,
+                                           (depth + threadsPerThreadgroup.depth - 1) / threadsPerThreadgroup.depth);
+            
+            let commandBuffer = commandQueue.makeCommandBuffer()
+            let computeEncoder = commandBuffer!.makeComputeCommandEncoder()!
+        
+            computeEncoder.setComputePipelineState(computePipeline)
+            
+            computeEncoder.setBuffer(dynamicUniformBuffer, offset: 0, index: 1)
+            
+            computeEncoder.setTexture(self.volumePool, index: TextureIndex.VolumePoolIndex.rawValue)
+            computeEncoder.setTexture(self.rawPool, index: TextureIndex.RawPoolIndex.rawValue)
+            
+            computeEncoder.dispatchThreadgroups(threadgroups, threadsPerThreadgroup: threadsPerThreadgroup)
+            
+            computeEncoder.endEncoding()
+            
+            commandBuffer?.commit()
+            commandBuffer?.waitUntilCompleted()
+        } catch {
+            print("Error creating gradient pipeline")
+        }
     }
 
     func calculateGradient(dim: vector_int3) {
@@ -408,7 +484,7 @@ class Renderer: NSObject, MTKViewDelegate {
             
             computeEncoder.setBuffer(dynamicUniformBuffer, offset: 0, index: 1)
             
-            computeEncoder.setTexture(self.brickPool, index: TextureIndex.BrickPoolIndex.rawValue)
+            computeEncoder.setTexture(self.volumePool, index: TextureIndex.VolumePoolIndex.rawValue)
             
             computeEncoder.dispatchThreadgroups(threadgroups, threadsPerThreadgroup: threadsPerThreadgroup)
             
@@ -575,7 +651,7 @@ class Renderer: NSObject, MTKViewDelegate {
             self.updateGameState()
             
             //self.generateWorkingSet()
-            if(self.brickPool != nil) {
+            if(self.volumePool != nil) {
                 //self.transferWorkingSet()
             
                 let width = Int(self.size!.width)
@@ -597,7 +673,7 @@ class Renderer: NSObject, MTKViewDelegate {
                 computeEncoder.setComputePipelineState(rtPipelineState!)
                 
                 computeEncoder.setTexture(accumulationTargets[accumulationTargetIdx], index: 0)
-                computeEncoder.setTexture(self.brickPool, index: TextureIndex.BrickPoolIndex.rawValue)
+                computeEncoder.setTexture(self.volumePool, index: TextureIndex.VolumePoolIndex.rawValue)
                 computeEncoder.useResource(self.accStruct!, usage: .read)
                 
                 computeEncoder.dispatchThreadgroups(threadgroups, threadsPerThreadgroup: threadsPerThreadgroup)
@@ -660,8 +736,10 @@ class Renderer: NSObject, MTKViewDelegate {
         textureDesc.usage = [.shaderWrite, .shaderRead]
         
         accumulationTargets.removeAll()
-        for _ in 0..<2 {
-            accumulationTargets.append(self.device.makeTexture(descriptor: textureDesc)!)
+        for idx in 0..<2 {
+            let tex = self.device.makeTexture(descriptor: textureDesc)!
+            tex.label = "Accumulation Target \(idx)"
+            accumulationTargets.append(tex)
         }
     }
 }
