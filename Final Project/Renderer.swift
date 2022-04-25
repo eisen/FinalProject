@@ -83,8 +83,8 @@ class Renderer: NSObject, MTKViewDelegate {
     var size: CGSize?
     public var rotation: float3 = [0, 0, 0]
     var target: float3 = [0, 0, 0]
-    var distance: Float = 2.5
-    var position: float3 = [0, 2.5, -2.5]
+    var distance: Float = 1.25
+    var position: float3 = [0, 1.25, -1.25]
     var dFactor: float3 = [1.0, 1.0, 1.0]
     
     var width: Int32 = 0;
