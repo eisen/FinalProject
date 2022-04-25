@@ -296,7 +296,6 @@ class Renderer: NSObject, MTKViewDelegate {
         }
         
         self.accStructDesc?.geometryDescriptors = geomDescs
-        self.accStructDesc?.usage = .refit
         
         let sizes = self.device.accelerationStructureSizes(descriptor: accStructDesc!)
         self.accStruct = self.device.makeAccelerationStructure(size: sizes.accelerationStructureSize)
@@ -384,23 +383,27 @@ class Renderer: NSObject, MTKViewDelegate {
     }
 
     func calculateGradient(dim: vector_int3) {
-        let threadsPerThreadgroup = MTLSizeMake(8, 8, 8)
-        let width = Int(dim.x)
-        let height = Int(dim.y)
-        let depth = Int(dim.z)
-        uniforms[0].width = UInt32(width)
-        uniforms[0].height = UInt32(height)
-        uniforms[0].depth = UInt32(depth)
-        self.updateDynamicBufferState()
-        let threadgroups = MTLSizeMake((width  + threadsPerThreadgroup.width  - 1) / threadsPerThreadgroup.width,
-                                           (height + threadsPerThreadgroup.height - 1) / threadsPerThreadgroup.height,
-                                       (depth + threadsPerThreadgroup.depth - 1) / threadsPerThreadgroup.depth);
-        
-        let commandBuffer = commandQueue.makeCommandBuffer()
-        let computeEncoder = commandBuffer!.makeComputeCommandEncoder()!
-        
         do {
-            try computeEncoder.setComputePipelineState(self.buildGradientPipelineWithDevice(device: self.device, metalKitView: self.metalKitView))
+            let computePipeline = try self.buildGradientPipelineWithDevice(device: self.device, metalKitView: self.metalKitView)
+            let tw = computePipeline.threadExecutionWidth
+            let th = computePipeline.maxTotalThreadsPerThreadgroup / (tw * 4)
+            let td = th / 2
+            let threadsPerThreadgroup = MTLSizeMake(tw, th, td)
+            let width = Int(dim.x)
+            let height = Int(dim.y)
+            let depth = Int(dim.z)
+            uniforms[0].width = UInt32(width)
+            uniforms[0].height = UInt32(height)
+            uniforms[0].depth = UInt32(depth)
+            self.updateDynamicBufferState()
+            let threadgroups = MTLSizeMake((width + threadsPerThreadgroup.width - 1) / threadsPerThreadgroup.width,
+                                               (height + threadsPerThreadgroup.height - 1) / threadsPerThreadgroup.height,
+                                           (depth + threadsPerThreadgroup.depth - 1) / threadsPerThreadgroup.depth);
+            
+            let commandBuffer = commandQueue.makeCommandBuffer()
+            let computeEncoder = commandBuffer!.makeComputeCommandEncoder()!
+        
+            computeEncoder.setComputePipelineState(computePipeline)
             
             computeEncoder.setBuffer(dynamicUniformBuffer, offset: 0, index: 1)
             
@@ -577,7 +580,9 @@ class Renderer: NSObject, MTKViewDelegate {
                 let width = Int(self.size!.width)
                 let height = Int(self.size!.height)
                 
-                let threadsPerThreadgroup = MTLSizeMake(8, 8, 1)
+                let tw: Int = rtPipelineState!.threadExecutionWidth
+                let th = rtPipelineState!.maxTotalThreadsPerThreadgroup / tw
+                let threadsPerThreadgroup = MTLSizeMake(tw, th, 1)
                 let threadgroups = MTLSizeMake((width  + threadsPerThreadgroup.width  - 1) / threadsPerThreadgroup.width,
                                                    (height + threadsPerThreadgroup.height - 1) / threadsPerThreadgroup.height,
                                                    1);
