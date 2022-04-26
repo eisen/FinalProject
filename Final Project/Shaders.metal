@@ -249,7 +249,7 @@ kernel void calculateNormal(constant Uniforms & uniforms [[buffer(1)]],
             normal += float3(normalList[i]);
         }
     } else {
-        normal = float3(voxel - (uint3(uniforms.width, uniforms.height, uniforms.depth)/2));
+        normal = float3(refVoxel - (uint3(uniforms.width, uniforms.height, uniforms.depth)/2));
     }
     
     brickPool.write(float4(normalize(normal), sample), tid);

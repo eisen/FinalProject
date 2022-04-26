@@ -39,7 +39,6 @@ class Renderer: NSObject, MTKViewDelegate {
     var depthState: MTLDepthStencilState
     
     var accumulationTargets: [MTLTexture] = []
-    var depthTexture: MTLTexture?
     var accumulationTargetIdx = 1
     
     var intersectionFunctionTable: MTLIntersectionFunctionTable?
@@ -81,10 +80,10 @@ class Renderer: NSObject, MTKViewDelegate {
     var instBuffer: MTLBuffer?
     
     var size: CGSize?
-    public var rotation: float3 = [0, 0, 0]
+    public var rotation: float3 = [-Float(15).degreesToRadians, 0, 0]
     var target: float3 = [0, 0, 0]
-    var distance: Float = 1.25
-    var position: float3 = [0, 1.25, -1.25]
+    var distance: Float = 1.5
+    var position: float3 = [0, 0, -1.5]
     var dFactor: float3 = [1.0, 1.0, 1.0]
     
     var width: Int32 = 0;
@@ -135,15 +134,6 @@ class Renderer: NSObject, MTKViewDelegate {
             print("Unable to build MetalKit Mesh. Error info: \(error)")
             return nil
         }
-        
-        let depthTextureDesc = MTLTextureDescriptor()
-        depthTextureDesc.pixelFormat = .rgba16Float
-        depthTextureDesc.textureType = .type2D
-        depthTextureDesc.width = 128
-        depthTextureDesc.height = 128
-        depthTextureDesc.usage = [.shaderRead, .renderTarget]
-        
-        depthTexture = self.device.makeTexture(descriptor: depthTextureDesc)!
 
         super.init()
         
@@ -290,7 +280,7 @@ class Renderer: NSObject, MTKViewDelegate {
             }
             
             self.convertTexture(dim: dim)
-            //self.rawPool = nil
+            self.rawPool = nil
             self.calculateGradient(dim: dim)
             
             DispatchQueue.main.async {
@@ -555,7 +545,7 @@ class Renderer: NSObject, MTKViewDelegate {
         
         let rotateMatrix = float4x4(
             rotationYXZ: [-rotation.x, rotation.y, rotation.z])
-        let distanceVector = float4(0, distance, -distance, 0)
+        let distanceVector = float4(0, 0, -distance, 0)
         let rotatedVector = rotateMatrix * distanceVector
         position = target + rotatedVector.xyz
         
